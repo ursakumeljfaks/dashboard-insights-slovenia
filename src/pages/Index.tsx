@@ -2,7 +2,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import SalaryVsPriceChart from "@/components/SalaryVsPriceChart";
 import AffordabilityTable from "@/components/AffordabilityTable";
 import { getMostAffordable, getLeastAffordable, municipalityData } from "@/data/realEstateData";
-import { Home, TrendingDown, TrendingUp, MapPin } from "lucide-react";
+import { Home, TrendingDown, TrendingUp, MapPin, Map } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Link } from "react-router-dom";
 
 const StatCard = ({ icon: Icon, label, value, sub }: { icon: any; label: string; value: string; sub: string }) => (
   <Card>
@@ -38,6 +40,14 @@ const Index = () => {
           <div>
             <h1 className="text-xl font-bold text-foreground tracking-tight">Nepremičninski trg Slovenije</h1>
             <p className="text-sm text-muted-foreground">Analiza cen stanovanj in plač po občinah</p>
+          </div>
+          <div className="ml-auto">
+            <Link to="/map">
+              <Button variant="outline" className="gap-2">
+                <Map className="h-4 w-4" />
+                Zemljevid
+              </Button>
+            </Link>
           </div>
         </div>
       </header>
