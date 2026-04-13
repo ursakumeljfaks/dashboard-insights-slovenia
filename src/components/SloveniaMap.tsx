@@ -146,6 +146,41 @@ const SloveniaMap = () => {
     };
   }, []);
 
+  // Preload telecom towers for distance calculation
+  useEffect(() => {
+    const fetchTowers = async () => {
+      try {
+        const query = POI_CONFIG.telecom_towers.query;
+        const res = await fetch(OVERPASS_URL, {
+          method: "POST",
+          body: `data=${encodeURIComponent(query)}`,
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        });
+        const json = await res.json();
+        const towers = (json.elements || [])
+          .map((el: any) => ({ lat: el.lat ?? el.center?.lat, lon: el.lon ?? el.center?.lon }))
+          .filter((t: any) => t.lat && t.lon);
+        poiCacheRef.current.telecom_towers = json.elements || [];
+
+        const distances: Record<string, number> = {};
+        mapped.forEach((d) => {
+          let minDist = Infinity;
+          towers.forEach((t: { lat: number; lon: number }) => {
+            const dist = haversineKm(d.lat, d.lon, t.lat, t.lon);
+            if (dist < minDist) minDist = dist;
+          });
+          distances[d.municipality] = minDist === Infinity ? -1 : minDist;
+        });
+        setTowerDistances(distances);
+      } catch (err) {
+        console.error("Failed to preload telecom towers:", err);
+      } finally {
+        setTowersLoading(false);
+      }
+    };
+    fetchTowers();
+  }, [mapped]);
+
   // Municipality markers
   useEffect(() => {
     const layer = markersLayerRef.current;
