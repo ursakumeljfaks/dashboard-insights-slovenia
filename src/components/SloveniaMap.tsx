@@ -10,7 +10,7 @@ const SLOVENIA_BBOX = "45.4,13.3,46.9,16.6";
 
 type LayerType = "prices" | "affordable" | "expensive";
 
-type POICategory = "post_offices" | "groceries" | "schools" | "pharmacies" | "fuel" | "banks" | "hospitals";
+type POICategory = "post_offices" | "groceries" | "schools" | "pharmacies" | "fuel" | "banks" | "hospitals" | "telecom_towers";
 
 const POI_CONFIG: Record<POICategory, { label: string; query: string; icon: string; color: string }> = {
   post_offices: {
@@ -54,6 +54,12 @@ const POI_CONFIG: Record<POICategory, { label: string; query: string; icon: stri
     query: `[out:json][timeout:25];(node["amenity"="hospital"](${SLOVENIA_BBOX});way["amenity"="hospital"](${SLOVENIA_BBOX}););out center;`,
     icon: "🏥",
     color: "#e91e63",
+  },
+  telecom_towers: {
+    label: "Telekom. stolpi",
+    query: `[out:json][timeout:25];(node["man_made"="mast"]["tower:type"="communication"](${SLOVENIA_BBOX});node["man_made"="tower"]["tower:type"="communication"](${SLOVENIA_BBOX}););out center;`,
+    icon: "📡",
+    color: "#607d8b",
   },
 };
 
