@@ -76,10 +76,22 @@ function priceToColor(price: number, min: number, max: number): string {
 
 const OVERPASS_URL = "https://overpass-api.de/api/interpreter";
 
+function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
 const SloveniaMap = () => {
   const [activeLayer, setActiveLayer] = useState<LayerType>("prices");
   const [activePOIs, setActivePOIs] = useState<Set<POICategory>>(new Set());
   const [loadingPOIs, setLoadingPOIs] = useState<Set<POICategory>>(new Set());
+  const [towerDistances, setTowerDistances] = useState<Record<string, number>>({});
+  const [towersLoading, setTowersLoading] = useState(true);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
   const markersLayerRef = useRef<L.LayerGroup | null>(null);
