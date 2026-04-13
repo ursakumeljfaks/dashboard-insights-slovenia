@@ -10,7 +10,7 @@ const SLOVENIA_BBOX = "45.4,13.3,46.9,16.6";
 
 type LayerType = "prices" | "affordable" | "expensive";
 
-type POICategory = "post_offices" | "groceries" | "schools" | "pharmacies" | "fuel" | "banks" | "hospitals";
+type POICategory = "post_offices" | "groceries" | "schools" | "pharmacies" | "fuel" | "banks" | "hospitals" | "telecom_towers";
 
 const POI_CONFIG: Record<POICategory, { label: string; query: string; icon: string; color: string }> = {
   post_offices: {
