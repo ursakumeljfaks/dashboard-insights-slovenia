@@ -210,6 +210,15 @@ const SloveniaMap = () => {
         dashArray: isSingle ? "4 3" : undefined,
       });
 
+      const towerDist = towerDistances[d.municipality];
+      const towerDistText = towersLoading
+        ? "Nalaganje…"
+        : towerDist == null || towerDist < 0
+          ? "Ni podatka"
+          : towerDist < 1
+            ? `${Math.round(towerDist * 1000)} m`
+            : `${towerDist.toFixed(1)} km`;
+
       marker.bindPopup(`
         <div style="font-size:14px;line-height:1.5;min-width:200px;">
           <div style="font-weight:700;font-size:16px;margin-bottom:6px;">${d.municipality}</div>
@@ -219,11 +228,12 @@ const SloveniaMap = () => {
           <div><strong>Povpr. bruto plača:</strong> €${d.avgGrossSalary.toLocaleString()}</div>
           <div><strong>Razmerje dostopnosti:</strong> ${d.affordabilityRatio.toFixed(2)}</div>
           <div><strong>Št. transakcij:</strong> ${d.sampleCount}</div>
+          <div><strong>📡 Najbližji telekom. stolp:</strong> ${towerDistText}</div>
         </div>
       `);
       marker.addTo(layer);
     });
-  }, [activeLayer, bottom10, maxPrice, minPrice, top10, visibleData]);
+  }, [activeLayer, bottom10, maxPrice, minPrice, top10, visibleData, towerDistances, towersLoading]);
 
   // POI toggle
   const togglePOI = useCallback(async (category: POICategory) => {
