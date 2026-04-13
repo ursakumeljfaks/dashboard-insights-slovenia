@@ -55,6 +55,12 @@ const POI_CONFIG: Record<POICategory, { label: string; query: string; icon: stri
     icon: "🏥",
     color: "#e91e63",
   },
+  telecom_towers: {
+    label: "Telekom. stolpi",
+    query: `[out:json][timeout:25];(node["man_made"="mast"]["tower:type"="communication"](${SLOVENIA_BBOX});node["man_made"="tower"]["tower:type"="communication"](${SLOVENIA_BBOX}););out center;`,
+    icon: "📡",
+    color: "#607d8b",
+  },
 };
 
 function priceToColor(price: number, min: number, max: number): string {
