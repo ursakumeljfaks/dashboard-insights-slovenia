@@ -76,10 +76,22 @@ function priceToColor(price: number, min: number, max: number): string {
 
 const OVERPASS_URL = "https://overpass-api.de/api/interpreter";
 
+function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
 const SloveniaMap = () => {
   const [activeLayer, setActiveLayer] = useState<LayerType>("prices");
   const [activePOIs, setActivePOIs] = useState<Set<POICategory>>(new Set());
   const [loadingPOIs, setLoadingPOIs] = useState<Set<POICategory>>(new Set());
+  const [towerDistances, setTowerDistances] = useState<Record<string, number>>({});
+  const [towersLoading, setTowersLoading] = useState(true);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
   const markersLayerRef = useRef<L.LayerGroup | null>(null);
@@ -134,6 +146,41 @@ const SloveniaMap = () => {
     };
   }, []);
 
+  // Preload telecom towers for distance calculation
+  useEffect(() => {
+    const fetchTowers = async () => {
+      try {
+        const query = POI_CONFIG.telecom_towers.query;
+        const res = await fetch(OVERPASS_URL, {
+          method: "POST",
+          body: `data=${encodeURIComponent(query)}`,
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        });
+        const json = await res.json();
+        const towers = (json.elements || [])
+          .map((el: any) => ({ lat: el.lat ?? el.center?.lat, lon: el.lon ?? el.center?.lon }))
+          .filter((t: any) => t.lat && t.lon);
+        poiCacheRef.current.telecom_towers = json.elements || [];
+
+        const distances: Record<string, number> = {};
+        mapped.forEach((d) => {
+          let minDist = Infinity;
+          towers.forEach((t: { lat: number; lon: number }) => {
+            const dist = haversineKm(d.lat, d.lon, t.lat, t.lon);
+            if (dist < minDist) minDist = dist;
+          });
+          distances[d.municipality] = minDist === Infinity ? -1 : minDist;
+        });
+        setTowerDistances(distances);
+      } catch (err) {
+        console.error("Failed to preload telecom towers:", err);
+      } finally {
+        setTowersLoading(false);
+      }
+    };
+    fetchTowers();
+  }, [mapped]);
+
   // Municipality markers
   useEffect(() => {
     const layer = markersLayerRef.current;
@@ -163,6 +210,15 @@ const SloveniaMap = () => {
         dashArray: isSingle ? "4 3" : undefined,
       });
 
+      const towerDist = towerDistances[d.municipality];
+      const towerDistText = towersLoading
+        ? "Nalaganje…"
+        : towerDist == null || towerDist < 0
+          ? "Ni podatka"
+          : towerDist < 1
+            ? `${Math.round(towerDist * 1000)} m`
+            : `${towerDist.toFixed(1)} km`;
+
       marker.bindPopup(`
         <div style="font-size:14px;line-height:1.5;min-width:200px;">
           <div style="font-weight:700;font-size:16px;margin-bottom:6px;">${d.municipality}</div>
@@ -172,11 +228,12 @@ const SloveniaMap = () => {
           <div><strong>Povpr. bruto plača:</strong> €${d.avgGrossSalary.toLocaleString()}</div>
           <div><strong>Razmerje dostopnosti:</strong> ${d.affordabilityRatio.toFixed(2)}</div>
           <div><strong>Št. transakcij:</strong> ${d.sampleCount}</div>
+          <div><strong>📡 Najbližji telekom. stolp:</strong> ${towerDistText}</div>
         </div>
       `);
       marker.addTo(layer);
     });
-  }, [activeLayer, bottom10, maxPrice, minPrice, top10, visibleData]);
+  }, [activeLayer, bottom10, maxPrice, minPrice, top10, visibleData, towerDistances, towersLoading]);
 
   // POI toggle
   const togglePOI = useCallback(async (category: POICategory) => {
