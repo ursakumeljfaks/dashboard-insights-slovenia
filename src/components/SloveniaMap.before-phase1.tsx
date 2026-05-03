@@ -189,61 +189,6 @@ function formatPercent(value: number | null | undefined): string {
   return `${(value * 100).toFixed(1)}%`;
 }
 
-function formatPricePerM2(value: number | null | undefined): string {
-  if (value == null || !Number.isFinite(value)) return "Ni podatka";
-  return `€${Math.round(value).toLocaleString()}`;
-}
-
-type SampleConfidence = {
-  label: string;
-  shortLabel: string;
-  description: string;
-  className: string;
-};
-
-function getSampleConfidence(sampleCount: number): SampleConfidence {
-  if (sampleCount <= 4) {
-    return {
-      label: "Nizka zanesljivost",
-      shortLabel: "Nizka",
-      description: "1–4 transakcije. Občino uporabljaj predvsem kot orientacijo, ne kot trden zaključek.",
-      className: "border-amber-300 bg-amber-50 text-amber-900",
-    };
-  }
-
-  if (sampleCount <= 15) {
-    return {
-      label: "Srednja zanesljivost",
-      shortLabel: "Srednja",
-      description: "5–15 transakcij. Primerjava je uporabna, ampak jo je treba brati z nekaj previdnosti.",
-      className: "border-sky-300 bg-sky-50 text-sky-900",
-    };
-  }
-
-  return {
-    label: "Bolj zanesljivo",
-    shortLabel: "Višja",
-    description: "15+ transakcij. Vzorec je bolj uporaben za primerjavo med občinami.",
-    className: "border-emerald-300 bg-emerald-50 text-emerald-900",
-  };
-}
-
-function getDistanceQualityLabel(value: number | null | undefined): string {
-  if (value == null || !Number.isFinite(value)) return "Ni podatka";
-  if (value <= 500) return "Zelo blizu";
-  if (value <= 1000) return "Blizu";
-  if (value <= 2500) return "Srednje";
-  return "Daleč";
-}
-
-function getDistanceQualityClass(value: number | null | undefined): string {
-  if (value == null || !Number.isFinite(value)) return "text-muted-foreground";
-  if (value <= 500) return "text-emerald-700";
-  if (value <= 1000) return "text-lime-700";
-  if (value <= 2500) return "text-amber-700";
-  return "text-red-700";
-}
-
 function escapeHtml(value: string | number | null | undefined): string {
   return String(value ?? "")
     .replaceAll("&", "&amp;")
@@ -325,7 +270,6 @@ const SloveniaMap = () => {
   const [clickProbe, setClickProbe] = useState<ClickProbe | null>(null);
   const [nearestResults, setNearestResults] = useState<NearestPoiResult[]>([]);
   const [poiError, setPoiError] = useState<string | null>(null);
-  const [advancedMunicipalityOpen, setAdvancedMunicipalityOpen] = useState(false);
 
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -499,7 +443,6 @@ const SloveniaMap = () => {
       salaryDeltaPct,
       isSingle: d.sampleCount === 1,
       lowSample: d.sampleCount < 5,
-      sampleConfidence: getSampleConfidence(d.sampleCount),
       affordabilityStatus,
     };
   }, [
@@ -525,10 +468,6 @@ const SloveniaMap = () => {
           (b.municipalityMedianDistanceM ?? Number.POSITIVE_INFINITY),
       );
   }, [selectedMunicipality, representativeByMunicipality, activePoiCategories]);
-
-  useEffect(() => {
-    setAdvancedMunicipalityOpen(false);
-  }, [selectedMunicipality]);
 
   const drawFullPoiLayer = useCallback((category: POICategory, pois: LoadedPoi[]) => {
     const map = mapRef.current;
@@ -949,50 +888,51 @@ const SloveniaMap = () => {
 
         <Card className="h-fit xl:sticky xl:top-4">
           <CardHeader>
-            <CardTitle>Pomočnik za oceno lokacije</CardTitle>
+            <CardTitle>Zemljevidna analiza</CardTitle>
             <CardDescription>
-              Dva načina: klik na prazno mapo preveri najbližje POI-je, klik na občinski krog odpre občinsko analitiko.
+              Klik na občinski krog odpre občinske metrike. Klik kamorkoli na mapo izračuna najbližje aktivne POI-je.
             </CardDescription>
           </CardHeader>
 
           <CardContent>
             <div className="space-y-4">
-              <div className="rounded-lg border bg-muted/20 p-3 text-sm">
-                <div className="mb-2 font-medium">1. Lokalni explorer</div>
-                <div className="mb-3 text-muted-foreground">
-                  Klikni kamorkoli na zemljevid. App bo za trenutno aktivne POI kategorije poiskal najbližje točke in narisal linije.
-                </div>
-
+              <div className="space-y-2 rounded-lg border p-3 text-sm">
                 <div className="flex items-center justify-between gap-3">
-                  <div className="text-xs text-muted-foreground">
-                    {clickProbe ? `Izbrana točka: ${clickProbe.lat.toFixed(5)}, ${clickProbe.lon.toFixed(5)}` : "Ni izbrane točke."}
-                  </div>
+                  <div className="font-medium">Click-anywhere nearest POI</div>
                   {clickProbe && (
-                    <button onClick={clearClickProbe} className="rounded-md border bg-card px-2 py-1 text-xs hover:bg-muted">
+                    <button onClick={clearClickProbe} className="rounded-md border px-2 py-1 text-xs hover:bg-muted">
                       Počisti
                     </button>
                   )}
                 </div>
 
-                {clickProbe && (
-                  <div className="mt-3 space-y-2">
+                {!clickProbe ? (
+                  <div className="text-muted-foreground">
+                    Klikni kamorkoli na zemljevid. Sistem bo za aktivne POI kategorije našel najbližjo točko in narisal linije.
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="text-xs text-muted-foreground">
+                      Izbrana točka: {clickProbe.lat.toFixed(5)}, {clickProbe.lon.toFixed(5)}
+                    </div>
+
                     {nearestResults.length === 0 ? (
-                      <div className="rounded-md border border-amber-300 bg-amber-50 p-2 text-amber-900">
-                        Za aktivne kategorije še ni naloženih POI podatkov. Počakaj, da se kategorije naložijo, ali vklopi dodatno kategorijo.
+                      <div className="text-muted-foreground">
+                        Za aktivne kategorije še ni naloženih POI podatkov. Vklopi ali ponovno naloži vsaj eno kategorijo.
                       </div>
                     ) : (
                       nearestResults.map((poi) => {
                         const cfg = POI_CONFIG[poi.category];
                         return (
-                          <div key={`${poi.category}-${poi.id}`} className="rounded-md border bg-card p-2">
+                          <div key={`${poi.category}-${poi.id}`} className="rounded-md border p-2">
                             <div className="flex items-start justify-between gap-3">
-                              <div className="min-w-0">
+                              <div>
                                 <div className="font-medium">
                                   {cfg.icon} {cfg.label}
                                 </div>
-                                <div className="truncate text-muted-foreground">{poi.name}</div>
+                                <div className="text-muted-foreground">{poi.name}</div>
                               </div>
-                              <div className="shrink-0 text-right font-semibold">{formatDistance(poi.distanceM)}</div>
+                              <div className="shrink-0 text-right font-medium">{formatDistance(poi.distanceM)}</div>
                             </div>
                           </div>
                         );
@@ -1004,154 +944,170 @@ const SloveniaMap = () => {
 
               <div className="border-t pt-4">
                 <div className="mb-3">
-                  <div className="font-medium">2. Občinska analitika</div>
-                  <div className="text-sm text-muted-foreground">
-                    Klikni občinski krog za cene, accessibility metrike, sample confidence in representative examples.
-                  </div>
+                  <div className="font-medium">Podrobnosti občine</div>
+                  <div className="text-sm text-muted-foreground">Klikni občinski krog za metrike iz municipalityAccessibilityLatest.ts.</div>
                 </div>
 
                 {!selectedData ? (
-                  <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
-                    Trenutno ni izbrane občine. Klikni enega od občinskih krogov na zemljevidu.
-                  </div>
+                  <div className="text-sm text-muted-foreground">Trenutno ni izbrane občine.</div>
                 ) : (
                   <div className="space-y-4">
-                    <div className="space-y-2">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <div className="text-xl font-semibold">{selectedData.displayMunicipality}</div>
-                          <div className="text-sm text-muted-foreground">Leto podatkov: {selectedData.saleYear}</div>
-                        </div>
-                        <span className={`shrink-0 rounded-full border px-2 py-1 text-xs font-medium ${selectedData.sampleConfidence.className}`}>
-                          {selectedData.sampleConfidence.shortLabel}
-                        </span>
-                      </div>
-
-                      <div className={`rounded-md border p-3 text-sm ${selectedData.sampleConfidence.className}`}>
-                        <div className="font-medium">{selectedData.sampleConfidence.label}</div>
-                        <div>{selectedData.sampleConfidence.description}</div>
+                    <div>
+                      <div className="text-xl font-semibold">{selectedData.displayMunicipality}</div>
+                      <div className="text-sm text-muted-foreground">Leto podatkov: {selectedData.saleYear}</div>
+                      <div className="text-sm text-muted-foreground">
+                        {selectedData.affordabilityStatus ?? "Affordability še ni na voljo v tej verziji podatkov."}
                       </div>
                     </div>
+
+                    {(selectedData.isSingle || selectedData.lowSample) && (
+                      <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+                        {selectedData.isSingle
+                          ? "Samo 1 transakcija – ta občina ni zelo reprezentativna."
+                          : "Malo transakcij – interpretacija naj bo previdna."}
+                      </div>
+                    )}
 
                     <div className="grid grid-cols-2 gap-3">
                       <div className="rounded-lg border p-3">
                         <div className="text-xs text-muted-foreground">Povpr. cena / m²</div>
-                        <div className="text-lg font-semibold">{formatPricePerM2(selectedData.avgPricePerM2)}</div>
+                        <div className="text-lg font-semibold">
+                          {selectedData.avgPricePerM2 != null ? `€${Math.round(selectedData.avgPricePerM2).toLocaleString()}` : "Ni podatka"}
+                        </div>
                       </div>
 
                       <div className="rounded-lg border p-3">
                         <div className="text-xs text-muted-foreground">Mediana cena / m²</div>
-                        <div className="text-lg font-semibold">{formatPricePerM2(selectedData.medianPricePerM2)}</div>
+                        <div className="text-lg font-semibold">
+                          {selectedData.medianPricePerM2 != null ? `€${Math.round(selectedData.medianPricePerM2).toLocaleString()}` : "Ni podatka"}
+                        </div>
+                      </div>
+
+                      <div className="rounded-lg border p-3">
+                        <div className="text-xs text-muted-foreground">Affordability ratio</div>
+                        <div className="text-lg font-semibold">
+                          {selectedData.affordabilityRatio != null ? selectedData.affordabilityRatio.toFixed(2) : "Ni podatka"}
+                        </div>
                       </div>
 
                       <div className="rounded-lg border p-3">
                         <div className="text-xs text-muted-foreground">Št. transakcij</div>
                         <div className="text-lg font-semibold">{selectedData.sampleCount.toLocaleString()}</div>
-                        <div className="text-xs text-muted-foreground">sample confidence</div>
-                      </div>
-
-                      <div className="rounded-lg border p-3">
-                        <div className="text-xs text-muted-foreground">Affordability</div>
-                        <div className="text-lg font-semibold">
-                          {selectedData.affordabilityRatio != null ? selectedData.affordabilityRatio.toFixed(2) : "V pripravi"}
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          {selectedData.avgNetSalary == null ? "salary merge še manjka" : "price-to-income"}
-                        </div>
                       </div>
                     </div>
 
-                    <div className="space-y-3 rounded-lg border p-3 text-sm">
-                      <div>
-                        <div className="font-medium">Accessibility summary</div>
-                        <div className="text-xs text-muted-foreground">
-                          Median distance pove tipično oddaljenost transakcij v občini do kategorije.
-                        </div>
+                    <div className="space-y-2 rounded-lg border p-3 text-sm">
+                      <div className="font-medium">Glavne accessibility metrike</div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Mediana trgovina</span>
+                        <span className="font-medium">{formatDistance(selectedData.medianGroceryM)}</span>
                       </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Mediana šola</span>
+                        <span className="font-medium">{formatDistance(selectedData.medianSchoolM)}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Mediana lekarna</span>
+                        <span className="font-medium">{formatDistance(selectedData.medianPharmacyM)}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Mediana zdravstvo</span>
+                        <span className="font-medium">{formatDistance(selectedData.medianHealthcareM)}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Mediana park</span>
+                        <span className="font-medium">{formatDistance(selectedData.medianParkM)}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Mediana bus postaja</span>
+                        <span className="font-medium">{formatDistance(selectedData.medianBusStopM)}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Mediana rail stop</span>
+                        <span className="font-medium">{formatDistance(selectedData.medianRailStopM)}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Mediana AC drive</span>
+                        <span className="font-medium">{formatDistance(selectedData.medianMotorwayJunctionDriveM)}</span>
+                      </div>
+                    </div>
 
-                      {[
-                        {
-                          icon: "🛒",
-                          label: "Trgovina",
-                          distance: selectedData.medianGroceryM,
-                          share: selectedData.shareGroceryWithin500m,
-                          shareLabel: "≤ 500 m",
-                        },
-                        {
-                          icon: "🏫",
-                          label: "Šola",
-                          distance: selectedData.medianSchoolM,
-                          share: selectedData.shareSchoolWithin1000m,
-                          shareLabel: "≤ 1000 m",
-                        },
-                        {
-                          icon: "💊",
-                          label: "Lekarna",
-                          distance: selectedData.medianPharmacyM,
-                          share: selectedData.sharePharmacyWithin1000m,
-                          shareLabel: "≤ 1000 m",
-                        },
-                        {
-                          icon: "🏥",
-                          label: "Zdravstvo",
-                          distance: selectedData.medianHealthcareM,
-                          share: null,
-                          shareLabel: null,
-                        },
-                        {
-                          icon: "🌳",
-                          label: "Park",
-                          distance: selectedData.medianParkM,
-                          share: null,
-                          shareLabel: null,
-                        },
-                        {
-                          icon: "🚌",
-                          label: "Bus / javni prevoz",
-                          distance: selectedData.medianBusStopM,
-                          share: null,
-                          shareLabel: null,
-                        },
-                        {
-                          icon: "🚆",
-                          label: "Železnica",
-                          distance: selectedData.medianRailStopM,
-                          share: null,
-                          shareLabel: null,
-                        },
-                        {
-                          icon: "🛣️",
-                          label: "AC priključek, drive",
-                          distance: selectedData.medianMotorwayJunctionDriveM,
-                          share: null,
-                          shareLabel: null,
-                        },
-                      ].map((item) => (
-                        <div key={item.label} className="rounded-md border p-2">
-                          <div className="flex items-center justify-between gap-3">
-                            <div className="min-w-0">
-                              <div className="font-medium">
-                                {item.icon} {item.label}
-                              </div>
-                              <div className="text-xs text-muted-foreground">
-                                {item.shareLabel ? `${formatPercent(item.share)} ${item.shareLabel}` : "mediana občinskih transakcij"}
-                              </div>
-                            </div>
-                            <div className="shrink-0 text-right">
-                              <div className="font-semibold">{formatDistance(item.distance)}</div>
-                              <div className={`text-xs font-medium ${getDistanceQualityClass(item.distance)}`}>
-                                {getDistanceQualityLabel(item.distance)}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
+                    <div className="space-y-2 rounded-lg border p-3 text-sm">
+                      <div className="font-medium">Deleži bližine</div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Šola znotraj 500 m</span>
+                        <span className="font-medium">{formatPercent(selectedData.shareSchoolWithin500m)}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Šola znotraj 1000 m</span>
+                        <span className="font-medium">{formatPercent(selectedData.shareSchoolWithin1000m)}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Trgovina znotraj 500 m</span>
+                        <span className="font-medium">{formatPercent(selectedData.shareGroceryWithin500m)}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Trgovina znotraj 1000 m</span>
+                        <span className="font-medium">{formatPercent(selectedData.shareGroceryWithin1000m)}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Lekarna znotraj 1000 m</span>
+                        <span className="font-medium">{formatPercent(selectedData.sharePharmacyWithin1000m)}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Lekarna znotraj 2000 m</span>
+                        <span className="font-medium">{formatPercent(selectedData.sharePharmacyWithin2000m)}</span>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2 rounded-lg border p-3 text-sm">
+                      <div className="font-medium">Rangi in odstopanja</div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Rang po ceni</span>
+                        <span className="font-medium">{selectedData.priceRank ? `#${selectedData.priceRank}` : "Ni podatka"}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Rang po dostopnosti</span>
+                        <span className="font-medium">{selectedData.affordabilityRank ? `#${selectedData.affordabilityRank}` : "Ni podatka"}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Cena vs. povpr. SLO</span>
+                        <span
+                          className={`font-medium ${
+                            selectedData.priceDeltaPct == null
+                              ? "text-muted-foreground"
+                              : selectedData.priceDeltaPct >= 0
+                                ? "text-red-600"
+                                : "text-emerald-600"
+                          }`}
+                        >
+                          {selectedData.priceDeltaPct == null
+                            ? "Ni podatka"
+                            : `${selectedData.priceDeltaPct >= 0 ? "+" : ""}${selectedData.priceDeltaPct.toFixed(1)}%`}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Neto plača vs. povpr. SLO</span>
+                        <span
+                          className={`font-medium ${
+                            selectedData.salaryDeltaPct == null
+                              ? "text-muted-foreground"
+                              : selectedData.salaryDeltaPct >= 0
+                                ? "text-emerald-600"
+                                : "text-red-600"
+                          }`}
+                        >
+                          {selectedData.salaryDeltaPct == null
+                            ? "Ni podatka"
+                            : `${selectedData.salaryDeltaPct >= 0 ? "+" : ""}${selectedData.salaryDeltaPct.toFixed(1)}%`}
+                        </span>
+                      </div>
                     </div>
 
                     <div className="space-y-2 rounded-lg border p-3 text-sm">
                       <div className="font-medium">Reprezentativni občinski primeri</div>
                       <div className="text-xs text-muted-foreground">
-                        To niso vsi POI-ji. To so samo primeri iz representativePoisLatest.ts za razlago izbrane občine.
+                        To ni glavni POI layer. To so samo primeri iz representativePoisLatest.ts za izbrano občino in aktivne kategorije.
                       </div>
 
                       {selectedRepresentativePois.length === 0 ? (
@@ -1160,16 +1116,16 @@ const SloveniaMap = () => {
                         </div>
                       ) : (
                         <div className="space-y-2">
-                          {selectedRepresentativePois.slice(0, 6).map((poi) => {
+                          {selectedRepresentativePois.map((poi) => {
                             const meta = representativePoiMeta[poi.category as RepresentativePoiCategory];
                             return (
                               <div key={`${poi.municipality}-${poi.category}`} className="rounded-md border p-2">
                                 <div className="flex items-start justify-between gap-3">
-                                  <div className="min-w-0">
+                                  <div>
                                     <div className="font-medium">
                                       {meta.icon} {meta.label}
                                     </div>
-                                    <div className="truncate text-muted-foreground">{poi.poiName}</div>
+                                    <div className="text-muted-foreground">{poi.poiName}</div>
                                   </div>
                                   <div className="shrink-0 text-right font-medium">{formatDistance(poi.repTxNearestDistanceM)}</div>
                                 </div>
@@ -1180,101 +1136,6 @@ const SloveniaMap = () => {
                               </div>
                             );
                           })}
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="rounded-lg border text-sm">
-                      <button
-                        type="button"
-                        onClick={() => setAdvancedMunicipalityOpen((open) => !open)}
-                        className="flex w-full items-center justify-between px-3 py-2 font-medium hover:bg-muted"
-                        aria-expanded={advancedMunicipalityOpen}
-                      >
-                        <span>Advanced details</span>
-                        <span>{advancedMunicipalityOpen ? "−" : "+"}</span>
-                      </button>
-
-                      {advancedMunicipalityOpen && (
-                        <div className="space-y-3 border-t p-3">
-                          <div className="space-y-2">
-                            <div className="font-medium">Deleži bližine</div>
-                            <div className="flex items-center justify-between">
-                              <span className="text-muted-foreground">Šola znotraj 500 m</span>
-                              <span className="font-medium">{formatPercent(selectedData.shareSchoolWithin500m)}</span>
-                            </div>
-                            <div className="flex items-center justify-between">
-                              <span className="text-muted-foreground">Šola znotraj 1000 m</span>
-                              <span className="font-medium">{formatPercent(selectedData.shareSchoolWithin1000m)}</span>
-                            </div>
-                            <div className="flex items-center justify-between">
-                              <span className="text-muted-foreground">Trgovina znotraj 500 m</span>
-                              <span className="font-medium">{formatPercent(selectedData.shareGroceryWithin500m)}</span>
-                            </div>
-                            <div className="flex items-center justify-between">
-                              <span className="text-muted-foreground">Trgovina znotraj 1000 m</span>
-                              <span className="font-medium">{formatPercent(selectedData.shareGroceryWithin1000m)}</span>
-                            </div>
-                            <div className="flex items-center justify-between">
-                              <span className="text-muted-foreground">Lekarna znotraj 1000 m</span>
-                              <span className="font-medium">{formatPercent(selectedData.sharePharmacyWithin1000m)}</span>
-                            </div>
-                            <div className="flex items-center justify-between">
-                              <span className="text-muted-foreground">Lekarna znotraj 2000 m</span>
-                              <span className="font-medium">{formatPercent(selectedData.sharePharmacyWithin2000m)}</span>
-                            </div>
-                          </div>
-
-                          <div className="space-y-2 border-t pt-3">
-                            <div className="font-medium">Rangi in odstopanja</div>
-                            <div className="flex items-center justify-between">
-                              <span className="text-muted-foreground">Rang po ceni</span>
-                              <span className="font-medium">{selectedData.priceRank ? `#${selectedData.priceRank}` : "Ni podatka"}</span>
-                            </div>
-                            <div className="flex items-center justify-between">
-                              <span className="text-muted-foreground">Rang po affordability</span>
-                              <span className="font-medium">{selectedData.affordabilityRank ? `#${selectedData.affordabilityRank}` : "Ni podatka"}</span>
-                            </div>
-                            <div className="flex items-center justify-between">
-                              <span className="text-muted-foreground">Cena vs. povpr. SLO</span>
-                              <span
-                                className={`font-medium ${
-                                  selectedData.priceDeltaPct == null
-                                    ? "text-muted-foreground"
-                                    : selectedData.priceDeltaPct >= 0
-                                      ? "text-red-600"
-                                      : "text-emerald-600"
-                                }`}
-                              >
-                                {selectedData.priceDeltaPct == null
-                                  ? "Ni podatka"
-                                  : `${selectedData.priceDeltaPct >= 0 ? "+" : ""}${selectedData.priceDeltaPct.toFixed(1)}%`}
-                              </span>
-                            </div>
-                            <div className="flex items-center justify-between">
-                              <span className="text-muted-foreground">Neto plača vs. povpr. SLO</span>
-                              <span
-                                className={`font-medium ${
-                                  selectedData.salaryDeltaPct == null
-                                    ? "text-muted-foreground"
-                                    : selectedData.salaryDeltaPct >= 0
-                                      ? "text-emerald-600"
-                                      : "text-red-600"
-                                }`}
-                              >
-                                {selectedData.salaryDeltaPct == null
-                                  ? "Ni podatka"
-                                  : `${selectedData.salaryDeltaPct >= 0 ? "+" : ""}${selectedData.salaryDeltaPct.toFixed(1)}%`}
-                              </span>
-                            </div>
-                          </div>
-
-                          <div className="space-y-2 border-t pt-3">
-                            <div className="font-medium">Opomba o metodologiji</div>
-                            <div className="text-muted-foreground">
-                              Občinske metrike so agregirane iz transakcij. Click-anywhere nearest explorer pa uporablja full POI layerje, ne representative POI primerov.
-                            </div>
-                          </div>
                         </div>
                       )}
                     </div>
