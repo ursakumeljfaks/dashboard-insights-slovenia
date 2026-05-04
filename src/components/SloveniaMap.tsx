@@ -9,6 +9,10 @@ import {
 } from "@/data/representativePoisLatest";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import "leaflet/dist/leaflet.css";
+import "leaflet.markercluster";
+import "leaflet.markercluster/dist/MarkerCluster.css";
+import "leaflet.markercluster/dist/MarkerCluster.Default.css";
+
 
 const SLOVENIA_CENTER: [number, number] = [46.15, 14.95];
 const SLOVENIA_ZOOM = 8;
@@ -329,10 +333,12 @@ const SloveniaMap = () => {
 
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
-  const markersLayerRef = useRef<L.LayerGroup | null>(null);
+  const markersLayerRef = useRef<L.MarkerClusterGroup | null>(null);
   const fullPoiLayersRef = useRef<Partial<Record<POICategory, L.LayerGroup>>>({});
   const representativeLayerRef = useRef<L.LayerGroup | null>(null);
   const nearestLayerRef = useRef<L.LayerGroup | null>(null);
+  const transactionLayerRef = useRef<L.LayerGroup | null>(null);
+  const zoomRef = useRef<number>(SLOVENIA_ZOOM);
   const poiCacheRef = useRef<Partial<Record<POICategory, LoadedPoi[]>>>({});
   const activePoiCategoriesRef = useRef(activePoiCategories);
 
@@ -511,6 +517,24 @@ const SloveniaMap = () => {
     nationalAvgNetSalary,
   ]);
 
+  const uniqueTransactions = useMemo(() => {
+    const seen = new Set<number>();
+    return representativePoisLatest
+      .filter((row) => {
+        if (row.repTxId == null || row.repTxLat == null || row.repTxLon == null) return false;
+        if (seen.has(row.repTxId)) return false;
+        seen.add(row.repTxId);
+        return true;
+      })
+      .map((row) => ({
+        id: row.repTxId as number,
+        lat: row.repTxLat as number,
+        lon: row.repTxLon as number,
+        pricePerM2: row.repTxPricePerM2,
+        municipality: row.municipality,
+      }));
+  }, []);
+
   const selectedRepresentativePois = useMemo(() => {
     if (!selectedMunicipality) return [];
 
@@ -643,9 +667,15 @@ const SloveniaMap = () => {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
     }).addTo(map);
 
-    markersLayerRef.current = L.layerGroup().addTo(map);
+    markersLayerRef.current = L.markerClusterGroup({ chunkedLoading: true }).addTo(map);
     representativeLayerRef.current = L.layerGroup().addTo(map);
     nearestLayerRef.current = L.layerGroup().addTo(map);
+    transactionLayerRef.current = L.layerGroup().addTo(map);
+
+    map.on("zoomend", () => {
+      zoomRef.current = map.getZoom();
+      map.fire("zoomchanged");
+});
 
     map.on("click", (event: L.LeafletMouseEvent) => {
       setClickProbe({ lat: event.latlng.lat, lon: event.latlng.lng });
@@ -687,15 +717,31 @@ const SloveniaMap = () => {
               ? "#999999"
               : priceToColor(d.avgPricePerM2 ?? minPrice, minPrice, maxPrice);
 
-      const radius = Math.max(5, Math.min(15, Math.sqrt(d.sampleCount) * 0.8));
+      const radius = Math.max(12, Math.min(15, Math.sqrt(d.sampleCount) * 2));
 
-      const marker = L.circleMarker([d.lat, d.lon], {
-        radius: isSelected ? radius + 2 : radius,
-        color: isSelected ? "#111827" : isSingle ? "#666" : markerColor,
-        fillColor: markerColor,
-        fillOpacity: isSingle ? 0.4 : 0.75,
-        weight: isSelected ? 3 : isSingle ? 2 : 1,
-        dashArray: isSingle ? "4 3" : undefined,
+      const size = Math.round(radius * 2) + 10;
+      const marker = L.marker([d.lat, d.lon], {
+        icon: L.divIcon({
+          html: `<div style="
+            width:${size}px;
+            height:${size}px;
+            border-radius:9999px;
+            background:${markerColor};
+            border:${isSelected ? "4px solid #111827" : "3px solid rgba(255,255,255,0.9)"};
+            opacity:${isSingle ? 0.6 : 0.9};
+            box-shadow:0 2px 8px rgba(0,0,0,0.35);
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            font-size:${Math.max(8, size / 3)}px;
+            font-weight:700;
+            color:white;
+            text-shadow:0 1px 2px rgba(0,0,0,0.5);
+          ">${d.sampleCount}</div>`,
+          iconSize: [size, size],
+          iconAnchor: [size / 2, size / 2],
+          className: "",
+        }),
         bubblingMouseEvents: false,
       });
 
@@ -720,6 +766,53 @@ const SloveniaMap = () => {
       marker.addTo(layer);
     });
   }, [activeLayer, hasAffordabilityData, maxPrice, minPrice, selectedMunicipality, visibleData]);
+
+  useEffect(() => {
+  const map = mapRef.current;
+  const layer = transactionLayerRef.current;
+  if (!map || !layer) return;
+
+  const updateTransactions = () => {
+    layer.clearLayers();
+    const zoom = map.getZoom();
+
+    if (zoom < 11) return;
+
+    const bounds = map.getBounds();
+
+    uniqueTransactions.forEach((tx) => {
+      if (!bounds.contains([tx.lat, tx.lon])) return;
+
+      const color = tx.pricePerM2 != null
+        ? priceToColor(tx.pricePerM2, minPrice, maxPrice)
+        : "#999999";
+
+      L.circleMarker([tx.lat, tx.lon], {
+        radius: 6,
+        color: "#fff",
+        fillColor: color,
+        fillOpacity: 0.9,
+        weight: 1.5,
+      })
+        .bindPopup(`
+          <div style="font-size:13px;line-height:1.5;">
+            <div style="font-weight:700;">${escapeHtml(tx.municipality)}</div>
+            <div>Cena/m²: ${tx.pricePerM2 != null ? `€${Math.round(tx.pricePerM2).toLocaleString()}` : "Ni podatka"}</div>
+          </div>
+        `)
+        .addTo(layer);
+    });
+  };
+
+  map.on("zoomchanged moveend", updateTransactions);
+  updateTransactions();
+
+  return () => {
+    map.off("zoomchanged moveend", updateTransactions);
+    layer.clearLayers();
+  };
+}, [uniqueTransactions, minPrice, maxPrice]);
+
 
   useEffect(() => {
     const layer = representativeLayerRef.current;
