@@ -14,8 +14,12 @@ const SLOVENIA_CENTER: [number, number] = [46.15, 14.95];
 const SLOVENIA_ZOOM = 8;
 const SLOVENIA_BBOX = "45.4,13.3,46.9,16.6";
 const OVERPASS_URL = "https://overpass-api.de/api/interpreter";
+const SLOVENIA_NUTS3_URL =
+  "https://gisco-services.ec.europa.eu/distribution/v2/nuts/geojson/NUTS_RG_60M_2024_4326_LEVL_3.geojson";
 
 type LayerType = "prices" | "affordable" | "expensive";
+type GeoJsonFeature = GeoJSON.Feature<GeoJSON.Geometry, Record<string, any>>;
+type GeoJsonFeatureCollection = GeoJSON.FeatureCollection<GeoJSON.Geometry, Record<string, any>>;
 
 type POICategory =
   | "school"
@@ -148,6 +152,61 @@ const POI_CONFIG: Record<POICategory, PoiConfig> = {
     );out center;`,
   },
 };
+
+
+function getFeatureName(feature: GeoJsonFeature): string {
+  return feature.properties?.NAME_LATN ?? feature.properties?.NUTS_NAME ?? feature.properties?.name ?? "Regija";
+}
+
+function getFeatureNutsId(feature: GeoJsonFeature): string {
+  return feature.properties?.NUTS_ID ?? getFeatureName(feature);
+}
+
+function isSloveniaNuts3Feature(feature: GeoJsonFeature): boolean {
+  return String(feature.properties?.NUTS_ID ?? "").startsWith("SI");
+}
+
+function pointInRing(lat: number, lon: number, ring: number[][]): boolean {
+  let inside = false;
+
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const xi = ring[i][0];
+    const yi = ring[i][1];
+    const xj = ring[j][0];
+    const yj = ring[j][1];
+
+    const intersects = yi > lat !== yj > lat && lon < ((xj - xi) * (lat - yi)) / (yj - yi || Number.EPSILON) + xi;
+    if (intersects) inside = !inside;
+  }
+
+  return inside;
+}
+
+function pointInPolygon(lat: number, lon: number, polygon: number[][][]): boolean {
+  if (!polygon.length) return false;
+  if (!pointInRing(lat, lon, polygon[0])) return false;
+
+  for (let i = 1; i < polygon.length; i += 1) {
+    if (pointInRing(lat, lon, polygon[i])) return false;
+  }
+
+  return true;
+}
+
+function pointInFeature(lat: number, lon: number, feature: GeoJsonFeature): boolean {
+  const geometry = feature.geometry;
+  if (!geometry) return false;
+
+  if (geometry.type === "Polygon") {
+    return pointInPolygon(lat, lon, geometry.coordinates as number[][][]);
+  }
+
+  if (geometry.type === "MultiPolygon") {
+    return (geometry.coordinates as number[][][][]).some((polygon) => pointInPolygon(lat, lon, polygon));
+  }
+
+  return false;
+}
 
 function normalizeMunicipalityKey(name: string): string {
   return name.normalize("NFC").trim().toUpperCase();
@@ -318,6 +377,11 @@ function getProbeIcon(): L.DivIcon {
 const SloveniaMap = () => {
   const [activeLayer, setActiveLayer] = useState<LayerType>("prices");
   const [selectedMunicipality, setSelectedMunicipality] = useState<string | null>(null);
+  const [regionsGeoJson, setRegionsGeoJson] = useState<GeoJsonFeatureCollection | null>(null);
+  const [selectedRegionId, setSelectedRegionId] = useState<string | null>(null);
+  const [selectedRegionName, setSelectedRegionName] = useState<string | null>(null);
+  const [selectedRegionFeature, setSelectedRegionFeature] = useState<GeoJsonFeature | null>(null);
+  const [regionsError, setRegionsError] = useState<string | null>(null);
   const [activePoiCategories, setActivePoiCategories] = useState<Set<POICategory>>(
     new Set(DEFAULT_POI_CATEGORIES),
   );
@@ -329,12 +393,39 @@ const SloveniaMap = () => {
 
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
+  const regionsLayerRef = useRef<L.GeoJSON | null>(null);
   const markersLayerRef = useRef<L.LayerGroup | null>(null);
   const fullPoiLayersRef = useRef<Partial<Record<POICategory, L.LayerGroup>>>({});
   const representativeLayerRef = useRef<L.LayerGroup | null>(null);
   const nearestLayerRef = useRef<L.LayerGroup | null>(null);
   const poiCacheRef = useRef<Partial<Record<POICategory, LoadedPoi[]>>>({});
   const activePoiCategoriesRef = useRef(activePoiCategories);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    fetch(SLOVENIA_NUTS3_URL)
+      .then((response) => {
+        if (!response.ok) throw new Error(`NUTS request failed: ${response.status}`);
+        return response.json();
+      })
+      .then((geojson: GeoJsonFeatureCollection) => {
+        if (cancelled) return;
+
+        setRegionsGeoJson({
+          ...geojson,
+          features: geojson.features.filter(isSloveniaNuts3Feature),
+        });
+      })
+      .catch((error) => {
+        console.error(error);
+        if (!cancelled) setRegionsError("Regij Slovenije ni bilo mogoče naložiti.");
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     activePoiCategoriesRef.current = activePoiCategories;
@@ -526,6 +617,18 @@ const SloveniaMap = () => {
       );
   }, [selectedMunicipality, representativeByMunicipality, activePoiCategories]);
 
+  const selectedRegionRepresentativePois = useMemo(() => {
+    if (!selectedRegionFeature) return [];
+
+    return representativePoisLatest
+      .filter((row) => activePoiCategories.has(row.category as POICategory))
+      .filter((row) => row.repTxLat != null && row.repTxLon != null && row.poiLat != null && row.poiLon != null)
+      .filter((row) => pointInFeature(row.repTxLat as number, row.repTxLon as number, selectedRegionFeature))
+      .sort((a, b) => (a.repTxPricePerM2 ?? 0) - (b.repTxPricePerM2 ?? 0));
+  }, [selectedRegionFeature, activePoiCategories]);
+
+  const mapRepresentativePois = selectedMunicipality ? selectedRepresentativePois : selectedRegionRepresentativePois;
+
   useEffect(() => {
     setAdvancedMunicipalityOpen(false);
   }, [selectedMunicipality]);
@@ -655,18 +758,69 @@ const SloveniaMap = () => {
 
     return () => {
       map.off("click");
+      regionsLayerRef.current?.remove();
       markersLayerRef.current?.clearLayers();
       representativeLayerRef.current?.clearLayers();
       nearestLayerRef.current?.clearLayers();
       (Object.values(fullPoiLayersRef.current) as L.LayerGroup[]).forEach((layer) => layer.clearLayers());
       map.remove();
       mapRef.current = null;
+      regionsLayerRef.current = null;
       markersLayerRef.current = null;
       representativeLayerRef.current = null;
       nearestLayerRef.current = null;
       fullPoiLayersRef.current = {};
     };
   }, []);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !regionsGeoJson) return;
+
+    if (regionsLayerRef.current) {
+      regionsLayerRef.current.remove();
+      regionsLayerRef.current = null;
+    }
+
+    const geoJsonLayer = L.geoJSON(regionsGeoJson as any, {
+      style: (feature) => {
+        const typedFeature = feature as GeoJsonFeature;
+        const nutsId = getFeatureNutsId(typedFeature);
+        const isSelected = selectedRegionId === nutsId;
+
+        return {
+          color: isSelected ? "#111827" : "#2563eb",
+          weight: isSelected ? 3 : 1.5,
+          fillColor: isSelected ? "#60a5fa" : "#93c5fd",
+          fillOpacity: isSelected ? 0.32 : 0.16,
+        };
+      },
+      onEachFeature: (feature, layer) => {
+        const typedFeature = feature as GeoJsonFeature;
+        const name = getFeatureName(typedFeature);
+        const nutsId = getFeatureNutsId(typedFeature);
+
+        layer.bindTooltip(`${name} (${nutsId})`);
+
+        layer.on("click", (event: L.LeafletMouseEvent) => {
+          L.DomEvent.stopPropagation(event.originalEvent);
+          setSelectedRegionId(nutsId);
+          setSelectedRegionName(name);
+          setSelectedRegionFeature(typedFeature);
+          setSelectedMunicipality(null);
+          setClickProbe(null);
+
+          if ("getBounds" in layer) {
+            map.fitBounds((layer as L.Polygon).getBounds(), { padding: [30, 30] });
+          }
+        });
+      },
+    });
+
+    geoJsonLayer.addTo(map);
+    geoJsonLayer.bringToBack();
+    regionsLayerRef.current = geoJsonLayer;
+  }, [regionsGeoJson, selectedRegionId]);
 
   useEffect(() => {
     const layer = markersLayerRef.current;
@@ -715,6 +869,9 @@ const SloveniaMap = () => {
       marker.on("click", (event: L.LeafletMouseEvent) => {
         L.DomEvent.stopPropagation(event.originalEvent);
         setSelectedMunicipality(d.municipalityKey);
+        setSelectedRegionId(null);
+        setSelectedRegionName(null);
+        setSelectedRegionFeature(null);
       });
 
       marker.addTo(layer);
@@ -727,9 +884,39 @@ const SloveniaMap = () => {
 
     layer.clearLayers();
 
-    selectedRepresentativePois.forEach((poi) => {
+    mapRepresentativePois.forEach((poi) => {
       const meta = representativePoiMeta[poi.category as RepresentativePoiCategory];
       if (!meta) return;
+
+      L.circleMarker([poi.repTxLat as number, poi.repTxLon as number], {
+        radius: selectedMunicipality ? 7 : 5,
+        color: "#111827",
+        fillColor: meta.color,
+        fillOpacity: 0.9,
+        weight: 2,
+        bubblingMouseEvents: false,
+      })
+        .bindPopup(
+          `<div style="font-size:13px;line-height:1.45;min-width:210px;">
+            <strong>Transakcijska točka</strong><br/>
+            Občina: ${escapeHtml(poi.municipality)}<br/>
+            Cena/m²: <strong>${formatPricePerM2(poi.repTxPricePerM2)}</strong><br/>
+            ${meta.icon} ${escapeHtml(meta.label)}: ${formatDistance(poi.repTxNearestDistanceM)}
+          </div>`,
+        )
+        .addTo(layer);
+
+      L.marker([poi.poiLat as number, poi.poiLon as number], {
+        icon: getPoiIcon(poi.category as POICategory),
+        bubblingMouseEvents: false,
+      })
+        .bindPopup(
+          `<div style="font-size:13px;line-height:1.45;">
+            <strong>${escapeHtml(poi.poiName)}</strong><br/>
+            <span style="color:${meta.color};">${meta.icon} ${escapeHtml(meta.label)}</span>
+          </div>`,
+        )
+        .addTo(layer);
 
       L.polyline(
         [
@@ -753,7 +940,7 @@ const SloveniaMap = () => {
         )
         .addTo(layer);
     });
-  }, [selectedRepresentativePois]);
+  }, [mapRepresentativePois]);
 
   useEffect(() => {
     const layer = nearestLayerRef.current;
@@ -925,6 +1112,8 @@ const SloveniaMap = () => {
         </div>
       </div>
 
+      {regionsError && <div className="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-900">{regionsError}</div>}
+
       {poiError && <div className="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-900">{poiError}</div>}
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
@@ -951,12 +1140,39 @@ const SloveniaMap = () => {
           <CardHeader>
             <CardTitle>Pomočnik za oceno lokacije</CardTitle>
             <CardDescription>
-              Dva načina: klik na prazno mapo preveri najbližje POI-je, klik na občinski krog odpre občinsko analitiko.
+              Klik na modro NUTS-3 regijo približa regijo in pokaže reprezentativne transakcijske točke. Klik na občinski krog odpre občinsko analitiko.
             </CardDescription>
           </CardHeader>
 
           <CardContent>
             <div className="space-y-4">
+              <div className="rounded-lg border bg-muted/20 p-3 text-sm">
+                <div className="mb-2 font-medium">Izbrana regija</div>
+                {selectedRegionName ? (
+                  <div className="space-y-2">
+                    <div>
+                      <div className="text-lg font-semibold">{selectedRegionName}</div>
+                      <div className="text-xs text-muted-foreground">{selectedRegionId}</div>
+                    </div>
+                    <div className="text-muted-foreground">
+                      Na zemljevidu je prikazanih {selectedRegionRepresentativePois.length} reprezentativnih transakcijskih točk za aktivne POI kategorije.
+                    </div>
+                    <button
+                      onClick={() => {
+                        setSelectedRegionId(null);
+                        setSelectedRegionName(null);
+                        setSelectedRegionFeature(null);
+                      }}
+                      className="rounded-md border bg-card px-2 py-1 text-xs hover:bg-muted"
+                    >
+                      Počisti regijo
+                    </button>
+                  </div>
+                ) : (
+                  <div className="text-muted-foreground">Klikni modro regijo na zemljevidu.</div>
+                )}
+              </div>
+
               <div className="rounded-lg border bg-muted/20 p-3 text-sm">
                 <div className="mb-2 font-medium">1. Lokalni explorer</div>
                 <div className="mb-3 text-muted-foreground">
@@ -1006,7 +1222,7 @@ const SloveniaMap = () => {
                 <div className="mb-3">
                   <div className="font-medium">2. Občinska analitika</div>
                   <div className="text-sm text-muted-foreground">
-                    Klikni občinski krog za cene, accessibility metrike, sample confidence in representative examples.
+                    Klikni občinski krog za cene, accessibility metrike, sample confidence in representative examples. Klik regije ne odpre te občinske analitike, ampak prikaže transakcijske točke na zemljevidu.
                   </div>
                 </div>
 
