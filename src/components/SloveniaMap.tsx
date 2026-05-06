@@ -61,7 +61,7 @@ type NearestPoiResult = LoadedPoi & {
   distanceM: number;
 };
 
-const DEFAULT_POI_CATEGORIES: POICategory[] = ["grocery", "school", "pharmacy", "healthcare"];
+const DEFAULT_POI_CATEGORIES: POICategory[] = /*["grocery", "school", "pharmacy", "healthcare"]*/ [];
 
 const POI_CONFIG: Record<POICategory, PoiConfig> = {
   school: {
