@@ -1,14 +1,18 @@
 export async function loadSloveniaNuts3() {
-  const res = await fetch(
-    "https://gisco-services.ec.europa.eu/distribution/v2/nuts/geojson/NUTS_RG_60M_2024_4326_LEVL_3.geojson"
-  );
+  const response = await fetch("/data/SR.geojson");
 
-  const geojson = await res.json();
+  if (!response.ok) {
+    throw new Error("Failed to load SR.geojson");
+  }
+
+  const geojson = await response.json();
 
   return {
     ...geojson,
-    features: geojson.features.filter((f: any) =>
-      f.properties.NUTS_ID.startsWith("SI")
-    ),
+    features: geojson.features.filter((f: any) => f.properties?.ENOTA === "SR"),
   };
+}
+
+export async function loadSloveniaStatisticalRegions() {
+  return loadSloveniaNuts3();
 }

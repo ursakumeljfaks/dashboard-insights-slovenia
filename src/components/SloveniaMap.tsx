@@ -12,10 +12,14 @@ import "leaflet/dist/leaflet.css";
 
 const SLOVENIA_CENTER: [number, number] = [46.15, 14.95];
 const SLOVENIA_ZOOM = 8;
+const SLOVENIA_MIN_ZOOM = 8;
+const SLOVENIA_MAX_ZOOM = 18;
+const SLOVENIA_MAX_BOUNDS: L.LatLngBoundsExpression = [
+  [45.35, 13.2],
+  [46.95, 16.75],
+];
 const SLOVENIA_BBOX = "45.4,13.3,46.9,16.6";
 const OVERPASS_URL = "https://overpass-api.de/api/interpreter";
-const SLOVENIA_NUTS3_URL =
-  "https://gisco-services.ec.europa.eu/distribution/v2/nuts/geojson/NUTS_RG_60M_2024_4326_LEVL_3.geojson";
 
 type LayerType = "prices" | "affordable" | "expensive";
 type GeoJsonFeature = GeoJSON.Feature<GeoJSON.Geometry, Record<string, any>>;
@@ -155,15 +159,11 @@ const POI_CONFIG: Record<POICategory, PoiConfig> = {
 
 
 function getFeatureName(feature: GeoJsonFeature): string {
-  return feature.properties?.NAME_LATN ?? feature.properties?.NUTS_NAME ?? feature.properties?.name ?? "Regija";
+  return feature.properties?.SR_UIME ?? feature.properties?.NAME_LATN ?? feature.properties?.NUTS_NAME ?? feature.properties?.name ?? "Regija";
 }
 
-function getFeatureNutsId(feature: GeoJsonFeature): string {
-  return feature.properties?.NUTS_ID ?? getFeatureName(feature);
-}
-
-function isSloveniaNuts3Feature(feature: GeoJsonFeature): boolean {
-  return String(feature.properties?.NUTS_ID ?? "").startsWith("SI");
+function getFeatureRegionId(feature: GeoJsonFeature): string {
+  return String(feature.properties?.SR_ID ?? feature.properties?.SR_MID ?? feature.properties?.NUTS_ID ?? getFeatureName(feature));
 }
 
 function pointInRing(lat: number, lon: number, ring: number[][]): boolean {
@@ -404,9 +404,12 @@ const SloveniaMap = () => {
   useEffect(() => {
     let cancelled = false;
 
-    fetch(SLOVENIA_NUTS3_URL)
+    fetch("/data/SR.geojson")
       .then((response) => {
-        if (!response.ok) throw new Error(`NUTS request failed: ${response.status}`);
+        if (!response.ok) {
+          throw new Error(`SR.geojson request failed: ${response.status}`);
+        }
+
         return response.json();
       })
       .then((geojson: GeoJsonFeatureCollection) => {
@@ -414,12 +417,12 @@ const SloveniaMap = () => {
 
         setRegionsGeoJson({
           ...geojson,
-          features: geojson.features.filter(isSloveniaNuts3Feature),
+          features: geojson.features.filter((feature) => feature.properties?.ENOTA === "SR"),
         });
       })
       .catch((error) => {
         console.error(error);
-        if (!cancelled) setRegionsError("Regij Slovenije ni bilo mogoče naložiti.");
+        if (!cancelled) setRegionsError("Statističnih regij Slovenije ni bilo mogoče naložiti.");
       });
 
     return () => {
@@ -733,45 +736,60 @@ const SloveniaMap = () => {
     [drawFullPoiLayer, loadPoisForCategory],
   );
 
-  useEffect(() => {
-    if (!containerRef.current || mapRef.current) return;
+useEffect(() => {
+  if (!containerRef.current || mapRef.current) return;
 
-    const map = L.map(containerRef.current, {
-      center: SLOVENIA_CENTER,
-      zoom: SLOVENIA_ZOOM,
-      scrollWheelZoom: true,
-    });
+  const sloveniaBounds = L.latLngBounds(
+    [45.4, 13.3],
+    [46.9, 16.6]
+  );
 
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-    }).addTo(map);
+  const map = L.map(containerRef.current, {
+    center: SLOVENIA_CENTER,
+    zoom: SLOVENIA_ZOOM,
+    minZoom: 8,
+    maxZoom: SLOVENIA_MAX_ZOOM,
+    maxBounds: sloveniaBounds.pad(0.8),
+    maxBoundsViscosity: 1.0,
+    scrollWheelZoom: true,
+    worldCopyJump: false,
+  });
 
-    markersLayerRef.current = L.layerGroup().addTo(map);
-    representativeLayerRef.current = L.layerGroup().addTo(map);
-    nearestLayerRef.current = L.layerGroup().addTo(map);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    noWrap: false,
+  }).addTo(map);
 
-    map.on("click", (event: L.LeafletMouseEvent) => {
-      setClickProbe({ lat: event.latlng.lat, lon: event.latlng.lng });
-    });
+  map.fitBounds(sloveniaBounds, {
+    padding: [20, 20],
+  });
 
-    mapRef.current = map;
+  markersLayerRef.current = L.layerGroup().addTo(map);
+  representativeLayerRef.current = L.layerGroup().addTo(map);
+  nearestLayerRef.current = L.layerGroup().addTo(map);
 
-    return () => {
-      map.off("click");
-      regionsLayerRef.current?.remove();
-      markersLayerRef.current?.clearLayers();
-      representativeLayerRef.current?.clearLayers();
-      nearestLayerRef.current?.clearLayers();
-      (Object.values(fullPoiLayersRef.current) as L.LayerGroup[]).forEach((layer) => layer.clearLayers());
-      map.remove();
-      mapRef.current = null;
-      regionsLayerRef.current = null;
-      markersLayerRef.current = null;
-      representativeLayerRef.current = null;
-      nearestLayerRef.current = null;
-      fullPoiLayersRef.current = {};
-    };
-  }, []);
+  map.on("click", (event: L.LeafletMouseEvent) => {
+    setClickProbe({ lat: event.latlng.lat, lon: event.latlng.lng });
+  });
+
+  mapRef.current = map;
+
+  return () => {
+    map.off("click");
+    regionsLayerRef.current?.remove();
+    markersLayerRef.current?.clearLayers();
+    representativeLayerRef.current?.clearLayers();
+    nearestLayerRef.current?.clearLayers();
+    (Object.values(fullPoiLayersRef.current) as L.LayerGroup[]).forEach((layer) => layer.clearLayers());
+    map.remove();
+    mapRef.current = null;
+    regionsLayerRef.current = null;
+    markersLayerRef.current = null;
+    representativeLayerRef.current = null;
+    nearestLayerRef.current = null;
+    fullPoiLayersRef.current = {};
+  };
+}, []);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -785,8 +803,8 @@ const SloveniaMap = () => {
     const geoJsonLayer = L.geoJSON(regionsGeoJson as any, {
       style: (feature) => {
         const typedFeature = feature as GeoJsonFeature;
-        const nutsId = getFeatureNutsId(typedFeature);
-        const isSelected = selectedRegionId === nutsId;
+        const regionId = getFeatureRegionId(typedFeature);
+        const isSelected = selectedRegionId === regionId;
 
         return {
           color: isSelected ? "#111827" : "#2563eb",
@@ -798,13 +816,13 @@ const SloveniaMap = () => {
       onEachFeature: (feature, layer) => {
         const typedFeature = feature as GeoJsonFeature;
         const name = getFeatureName(typedFeature);
-        const nutsId = getFeatureNutsId(typedFeature);
+        const regionId = getFeatureRegionId(typedFeature);
 
-        layer.bindTooltip(`${name} (${nutsId})`);
+        layer.bindTooltip(`${name} (${regionId})`);
 
         layer.on("click", (event: L.LeafletMouseEvent) => {
           L.DomEvent.stopPropagation(event.originalEvent);
-          setSelectedRegionId(nutsId);
+          setSelectedRegionId(regionId);
           setSelectedRegionName(name);
           setSelectedRegionFeature(typedFeature);
           setSelectedMunicipality(null);
@@ -820,6 +838,10 @@ const SloveniaMap = () => {
     geoJsonLayer.addTo(map);
     geoJsonLayer.bringToBack();
     regionsLayerRef.current = geoJsonLayer;
+
+    if (!selectedRegionId) {
+      map.fitBounds(SLOVENIA_MAX_BOUNDS, { padding: [20, 20] });
+    }
   }, [regionsGeoJson, selectedRegionId]);
 
   useEffect(() => {
@@ -1140,7 +1162,7 @@ const SloveniaMap = () => {
           <CardHeader>
             <CardTitle>Pomočnik za oceno lokacije</CardTitle>
             <CardDescription>
-              Klik na modro NUTS-3 regijo približa regijo in pokaže reprezentativne transakcijske točke. Klik na občinski krog odpre občinsko analitiko.
+              Klik na modro statistično regijo približa regijo in pokaže reprezentativne transakcijske točke. Klik na občinski krog odpre občinsko analitiko.
             </CardDescription>
           </CardHeader>
 
