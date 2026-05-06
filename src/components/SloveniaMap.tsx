@@ -517,22 +517,20 @@ const SloveniaMap = () => {
     nationalAvgNetSalary,
   ]);
 
-  const uniqueTransactions = useMemo(() => {
-    const seen = new Set<number>();
-    return representativePoisLatest
-      .filter((row) => {
-        if (row.repTxId == null || row.repTxLat == null || row.repTxLon == null) return false;
-        if (seen.has(row.repTxId)) return false;
-        seen.add(row.repTxId);
-        return true;
-      })
-      .map((row) => ({
-        id: row.repTxId as number,
-        lat: row.repTxLat as number,
-        lon: row.repTxLon as number,
-        pricePerM2: row.repTxPricePerM2,
-        municipality: row.municipality,
-      }));
+  const [uniqueTransactions, setUniqueTransactions] = useState<{
+    id: string;
+    lat: number;
+    lon: number;
+    pricePerM2: number | null;
+    municipality: string;
+    saleYear: number | null;
+  }[]>([]);
+
+  useEffect(() => {
+    fetch("/data/transactions.json")
+      .then((r) => r.json())
+      .then((data) => setUniqueTransactions(data))
+      .catch((e) => console.error("Transakcij ni bilo mogoče naložiti", e));
   }, []);
 
   const selectedRepresentativePois = useMemo(() => {
