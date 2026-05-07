@@ -9,9 +9,6 @@ import {
 } from "@/data/representativePoisLatest";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import "leaflet/dist/leaflet.css";
-import "leaflet.markercluster";
-import "leaflet.markercluster/dist/MarkerCluster.css";
-import "leaflet.markercluster/dist/MarkerCluster.Default.css";
 
 const SLOVENIA_CENTER: [number, number] = [46.15, 14.95];
 const SLOVENIA_ZOOM = 8;
@@ -393,17 +390,14 @@ const SloveniaMap = () => {
   const [nearestResults, setNearestResults] = useState<NearestPoiResult[]>([]);
   const [poiError, setPoiError] = useState<string | null>(null);
   const [advancedMunicipalityOpen, setAdvancedMunicipalityOpen] = useState(false);
-  const [currentZoom, setCurrentZoom] = useState(SLOVENIA_ZOOM);
 
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
   const regionsLayerRef = useRef<L.GeoJSON | null>(null);
-  const markersLayerRef = useRef<L.MarkerClusterGroup | null>(null);
+  const markersLayerRef = useRef<L.LayerGroup | null>(null);
   const fullPoiLayersRef = useRef<Partial<Record<POICategory, L.LayerGroup>>>({});
   const representativeLayerRef = useRef<L.LayerGroup | null>(null);
   const nearestLayerRef = useRef<L.LayerGroup | null>(null);
-  const transactionLayerRef = useRef<L.LayerGroup | null>(null);
-  const zoomRef = useRef<number>(SLOVENIA_ZOOM);
   const poiCacheRef = useRef<Partial<Record<POICategory, LoadedPoi[]>>>({});
   const activePoiCategoriesRef = useRef(activePoiCategories);
 
@@ -566,22 +560,6 @@ const SloveniaMap = () => {
       ),
     [affordabilityRows],
   );
-
-  const [uniqueTransactions, setUniqueTransactions] = useState<{
-    id: string;
-    lat: number;
-    lon: number;
-    pricePerM2: number | null;
-    municipality: string;
-    saleYear: number | null;
-  }[]>([]);
-
-  useEffect(() => {
-    fetch("/data/transactions.json")
-      .then((r) => r.json())
-      .then((data) => setUniqueTransactions(data))
-      .catch((e) => console.error("Transakcij ni bilo mogoče naložiti", e));
-  }, []);
 
   const selectedData = useMemo(() => {
     if (!selectedMunicipality) return null;
@@ -786,39 +764,9 @@ useEffect(() => {
     padding: [20, 20],
   });
 
-  markersLayerRef.current = L.markerClusterGroup({
-    chunkedLoading: true,
-    showCoverageOnHover: false,
-    disableClusteringAtZoom: 10,
-    maxClusterRadius: 60,
-    spiderfyOnMaxZoom: false,
-    spiderfyDistanceMultiplier: 0,
-    zoomToBoundsOnClick: false,
-  }).addTo(map);
-
-  markersLayerRef.current.on("clusterclick", (event: any) => {
-    L.DomEvent.stopPropagation(event.originalEvent);
-
-    const currentZoom = map.getZoom();
-    const cluster = event.layer;
-    const clusterBounds = cluster?.getBounds?.();
-    const boundsZoom = clusterBounds ? map.getBoundsZoom(clusterBounds, false) : currentZoom + 1;
-    const nextZoom = Math.min(
-      SLOVENIA_MAX_ZOOM,
-      Math.max(currentZoom + 1, boundsZoom, currentZoom),
-    );
-
-    map.setView(cluster.getLatLng(), nextZoom, { animate: true });
-  });
+  markersLayerRef.current = L.layerGroup().addTo(map);
   representativeLayerRef.current = L.layerGroup().addTo(map);
   nearestLayerRef.current = L.layerGroup().addTo(map);
-  transactionLayerRef.current = L.layerGroup().addTo(map);
-
-  map.on("zoomend", () => {
-    zoomRef.current = map.getZoom();
-    setCurrentZoom(map.getZoom());
-    map.fire("zoomchanged");
-  });
 
   map.on("click", (event: L.LeafletMouseEvent) => {
     setClickProbe({ lat: event.latlng.lat, lon: event.latlng.lng });
@@ -828,13 +776,10 @@ useEffect(() => {
 
   return () => {
     map.off("click");
-    map.off("zoomend");
-    markersLayerRef.current?.off("clusterclick");
     regionsLayerRef.current?.remove();
     markersLayerRef.current?.clearLayers();
     representativeLayerRef.current?.clearLayers();
     nearestLayerRef.current?.clearLayers();
-    transactionLayerRef.current?.clearLayers();
     (Object.values(fullPoiLayersRef.current) as L.LayerGroup[]).forEach((layer) => layer.clearLayers());
     map.remove();
     mapRef.current = null;
@@ -842,7 +787,6 @@ useEffect(() => {
     markersLayerRef.current = null;
     representativeLayerRef.current = null;
     nearestLayerRef.current = null;
-    transactionLayerRef.current = null;
     fullPoiLayersRef.current = {};
   };
 }, []);
@@ -906,9 +850,6 @@ useEffect(() => {
 
     layer.clearLayers();
 
-    const zoom = mapRef.current?.getZoom() ?? zoomRef.current;
-    if (zoom >= 13) return;
-
     visibleData.forEach((d) => {
       const isSingle = d.sampleCount === 1;
       const isSelected = d.municipalityKey === selectedMunicipality;
@@ -922,31 +863,15 @@ useEffect(() => {
               ? "#999999"
               : priceToColor(d.avgPricePerM2 ?? minPrice, minPrice, maxPrice);
 
-      const radius = Math.max(12, Math.min(15, Math.sqrt(d.sampleCount) * 2));
-      const size = Math.round(radius * 2) + 10;
+      const radius = Math.max(5, Math.min(15, Math.sqrt(d.sampleCount) * 0.8));
 
-      const marker = L.marker([d.lat, d.lon], {
-        icon: L.divIcon({
-          html: `<div style="
-            width:${size}px;
-            height:${size}px;
-            border-radius:9999px;
-            background:${markerColor};
-            border:${isSelected ? "4px solid #111827" : "3px solid rgba(255,255,255,0.9)"};
-            opacity:${isSingle ? 0.6 : 0.9};
-            box-shadow:0 2px 8px rgba(0,0,0,0.35);
-            display:flex;
-            align-items:center;
-            justify-content:center;
-            font-size:${Math.max(8, size / 3)}px;
-            font-weight:700;
-            color:white;
-            text-shadow:0 1px 2px rgba(0,0,0,0.5);
-          ">${d.sampleCount}</div>`,
-          iconSize: [size, size],
-          iconAnchor: [size / 2, size / 2],
-          className: "",
-        }),
+      const marker = L.circleMarker([d.lat, d.lon], {
+        radius: isSelected ? radius + 2 : radius,
+        color: isSelected ? "#111827" : isSingle ? "#666" : markerColor,
+        fillColor: markerColor,
+        fillOpacity: isSingle ? 0.4 : 0.75,
+        weight: isSelected ? 3 : isSingle ? 2 : 1,
+        dashArray: isSingle ? "4 3" : undefined,
         bubblingMouseEvents: false,
       });
 
@@ -966,60 +891,14 @@ useEffect(() => {
       marker.on("click", (event: L.LeafletMouseEvent) => {
         L.DomEvent.stopPropagation(event.originalEvent);
         setSelectedMunicipality(d.municipalityKey);
-        mapRef.current?.setView([d.lat, d.lon], 13, { animate: true });
+        setSelectedRegionId(null);
+        setSelectedRegionName(null);
+        setSelectedRegionFeature(null);
       });
 
       marker.addTo(layer);
     });
-  }, [activeLayer, currentZoom, hasAffordabilityData, maxPrice, minPrice, selectedMunicipality, visibleData]);
-
-  useEffect(() => {
-    const map = mapRef.current;
-    const layer = transactionLayerRef.current;
-    if (!map || !layer) return;
-
-    const updateTransactions = () => {
-      layer.clearLayers();
-      const zoom = map.getZoom();
-
-      if (zoom < 13) return;
-
-      const bounds = map.getBounds();
-
-      uniqueTransactions.forEach((tx) => {
-        if (!bounds.contains([tx.lat, tx.lon])) return;
-
-        const color = tx.pricePerM2 != null
-          ? priceToColor(tx.pricePerM2, minPrice, maxPrice)
-          : "#999999";
-
-        L.circleMarker([tx.lat, tx.lon], {
-          radius: 6,
-          color: "#fff",
-          fillColor: color,
-          fillOpacity: 0.9,
-          weight: 1.5,
-          bubblingMouseEvents: false,
-        })
-          .bindPopup(`
-            <div style="font-size:13px;line-height:1.5;">
-              <div style="font-weight:700;">${escapeHtml(tx.municipality)}</div>
-              <div>Cena/m²: ${tx.pricePerM2 != null ? `€${Math.round(tx.pricePerM2).toLocaleString()}` : "Ni podatka"}</div>
-              <div>Leto: ${tx.saleYear ?? "Ni podatka"}</div>
-            </div>
-          `)
-          .addTo(layer);
-      });
-    };
-
-    map.on("zoomchanged moveend", updateTransactions);
-    updateTransactions();
-
-    return () => {
-      map.off("zoomchanged moveend", updateTransactions);
-      layer.clearLayers();
-    };
-  }, [uniqueTransactions, minPrice, maxPrice]);
+  }, [activeLayer, hasAffordabilityData, maxPrice, minPrice, selectedMunicipality, visibleData]);
 
   useEffect(() => {
     const layer = representativeLayerRef.current;
