@@ -666,7 +666,13 @@ const SloveniaMap = () => {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
     }).addTo(map);
 
-    markersLayerRef.current = L.markerClusterGroup({ chunkedLoading: true }).addTo(map);
+    markersLayerRef.current = L.markerClusterGroup({ 
+      chunkedLoading: true,
+      disableClusteringAtZoom: 10,
+      maxClusterRadius: 60,
+      spiderfyOnMaxZoom: false,
+      spiderfyDistanceMultiplier: 0,
+    }).addTo(map);
     representativeLayerRef.current = L.layerGroup().addTo(map);
     nearestLayerRef.current = L.layerGroup().addTo(map);
     transactionLayerRef.current = L.layerGroup().addTo(map);
@@ -764,8 +770,8 @@ const SloveniaMap = () => {
       marker.on("click", (event: L.LeafletMouseEvent) => {
         L.DomEvent.stopPropagation(event.originalEvent);
         setSelectedMunicipality(d.municipalityKey);
+        mapRef.current?.setView([d.lat, d.lon], 13, { animate: true });
       });
-
       marker.addTo(layer);
     });
   }, [activeLayer, hasAffordabilityData, maxPrice, minPrice, selectedMunicipality, visibleData, currentZoom]);
