@@ -330,6 +330,7 @@ const SloveniaMap = () => {
   const [nearestResults, setNearestResults] = useState<NearestPoiResult[]>([]);
   const [poiError, setPoiError] = useState<string | null>(null);
   const [advancedMunicipalityOpen, setAdvancedMunicipalityOpen] = useState(false);
+  const [currentZoom, setCurrentZoom] = useState(SLOVENIA_ZOOM);
 
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -672,8 +673,9 @@ const SloveniaMap = () => {
 
     map.on("zoomend", () => {
       zoomRef.current = map.getZoom();
+      setCurrentZoom(map.getZoom());
       map.fire("zoomchanged");
-});
+    });
 
     map.on("click", (event: L.LeafletMouseEvent) => {
       setClickProbe({ lat: event.latlng.lat, lon: event.latlng.lng });
@@ -701,6 +703,9 @@ const SloveniaMap = () => {
     if (!layer) return;
 
     layer.clearLayers();
+
+    const currentZoom = mapRef.current?.getZoom() ?? 0;
+      if (currentZoom >= 13) return;
 
     visibleData.forEach((d) => {
       const isSingle = d.sampleCount === 1;
@@ -763,7 +768,7 @@ const SloveniaMap = () => {
 
       marker.addTo(layer);
     });
-  }, [activeLayer, hasAffordabilityData, maxPrice, minPrice, selectedMunicipality, visibleData]);
+  }, [activeLayer, hasAffordabilityData, maxPrice, minPrice, selectedMunicipality, visibleData, currentZoom]);
 
   useEffect(() => {
   const map = mapRef.current;
@@ -774,7 +779,7 @@ const SloveniaMap = () => {
     layer.clearLayers();
     const zoom = map.getZoom();
 
-    if (zoom < 11) return;
+    if (zoom < 13) return;
 
     const bounds = map.getBounds();
 
