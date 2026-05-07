@@ -668,6 +668,7 @@ const SloveniaMap = () => {
 
     markersLayerRef.current = L.markerClusterGroup({ 
       chunkedLoading: true,
+      showCoverageOnHover: false,
       disableClusteringAtZoom: 10,
       maxClusterRadius: 60,
       spiderfyOnMaxZoom: false,
