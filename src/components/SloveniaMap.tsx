@@ -695,6 +695,18 @@ const SloveniaMap = () => {
     const cached = poiCacheRef.current[category];
     if (cached) return cached;
 
+    const storageKey = `poi_cache_${category}`;
+    try {
+      const stored = localStorage.getItem(storageKey);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        poiCacheRef.current[category] = parsed;
+        return parsed;
+      }
+    } catch {
+      // ignore
+    }
+
     const cfg = POI_CONFIG[category];
     const response = await fetch(OVERPASS_URL, {
       method: "POST",
@@ -719,6 +731,11 @@ const SloveniaMap = () => {
       });
 
     poiCacheRef.current[category] = pois;
+    try {
+      localStorage.setItem(`poi_cache_${category}`, JSON.stringify(pois));
+    } catch {
+      // ignore če je localStorage poln
+    }
     return pois;
   }, []);
 
