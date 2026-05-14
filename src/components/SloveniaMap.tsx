@@ -394,6 +394,9 @@ const SloveniaMap = () => {
   const [poiError, setPoiError] = useState<string | null>(null);
   const [advancedMunicipalityOpen, setAdvancedMunicipalityOpen] = useState(false);
   const [currentZoom, setCurrentZoom] = useState(SLOVENIA_ZOOM);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<{display_name: string; lat: string; lon: string}[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
 
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -1147,6 +1150,26 @@ useEffect(() => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [drawFullPoiLayer, loadPoisForCategory]);
 
+  const searchAddress = useCallback(async (query: string) => {
+    if (!query.trim()) {
+      setSearchResults([]);
+      return;
+    }
+    setSearchLoading(true);
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&countrycodes=si&format=json&limit=5`,
+        { headers: { "Accept-Language": "sl", "User-Agent": "dashboard-insights-slovenia/1.0" } }
+      );
+      const data = await response.json();
+      setSearchResults(data);
+    } catch {
+      setSearchResults([]);
+    } finally {
+      setSearchLoading(false);
+    }
+  }, []);
+
   const clearClickProbe = useCallback(() => {
     setClickProbe(null);
     setNearestResults([]);
@@ -1232,6 +1255,46 @@ useEffect(() => {
           <div className="h-3 w-3 rounded-full border-2 border-dashed" style={{ borderColor: "#666", backgroundColor: "#99999966" }} />
           <span>1 transakcija</span>
         </div>
+      </div>
+      
+      <div className="relative">
+        <input
+          type="text"
+          placeholder="Išči naslov ali ulico v Sloveniji..."
+          value={searchQuery}
+          onChange={(e) => {
+            setSearchQuery(e.target.value);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              void searchAddress(searchQuery);
+            }
+          }}
+          className="w-full rounded-lg border px-4 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-primary"
+        />
+        {searchLoading && (
+          <div className="absolute right-3 top-2.5 text-xs text-muted-foreground">Iščem...</div>
+        )}
+        {searchResults.length > 0 && (
+          <div className="absolute z-[1000] mt-1 w-full rounded-lg border bg-card shadow-lg">
+            {searchResults.map((result, i) => (
+              <button
+                key={i}
+                className="w-full px-4 py-2 text-left text-sm hover:bg-muted"
+                onClick={() => {
+                  const lat = parseFloat(result.lat);
+                  const lon = parseFloat(result.lon);
+                  mapRef.current?.setView([lat, lon], 15, { animate: true });
+                  setSearchQuery(result.display_name);
+                  setSearchResults([]);
+                  setClickProbe({ lat, lon });
+                }}
+              >
+                {result.display_name}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_400px]">
