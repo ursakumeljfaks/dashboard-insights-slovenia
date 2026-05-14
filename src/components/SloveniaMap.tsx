@@ -1005,6 +1005,7 @@ useEffect(() => {
             <div style="font-size:13px;line-height:1.5;">
               <div style="font-weight:700;">${escapeHtml(tx.municipality)}</div>
               <div>Cena/m²: ${tx.pricePerM2 != null ? `€${Math.round(tx.pricePerM2).toLocaleString()}` : "Ni podatka"}</div>
+              <div>Površina: ${(tx as any).areaM2 != null ? `${(tx as any).areaM2} m²` : "Ni podatka"}</div>
               <div>Leto: ${tx.saleYear ?? "Ni podatka"}</div>
             </div>
           `)
