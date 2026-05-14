@@ -863,10 +863,10 @@ useEffect(() => {
         const isSelected = selectedRegionId === regionId;
 
         return {
-          color: isSelected ? "#111827" : "#2563eb",
+          color: isSelected ? "#2563eb" : "#111827",
           weight: isSelected ? 3 : 1.5,
           fillColor: isSelected ? "#60a5fa" : "#93c5fd",
-          fillOpacity: isSelected ? 0.32 : 0.16,
+          fillOpacity: isSelected ? 0 : 0.08,
         };
       },
       onEachFeature: (feature, layer) => {
@@ -884,7 +884,7 @@ useEffect(() => {
           setSelectedMunicipality(null);
           setClickProbe(null);
 
-          if ("getBounds" in layer) {
+          if ("getBounds" in layer && map.getZoom() < 10) {
             map.fitBounds((layer as L.Polygon).getBounds(), { padding: [30, 30] });
           }
         });
@@ -1009,6 +1009,12 @@ useEffect(() => {
               <div>Leto: ${tx.saleYear ?? "Ni podatka"}</div>
             </div>
           `)
+          .on("click", (event: L.LeafletMouseEvent) => {
+            L.DomEvent.stopPropagation(event.originalEvent);
+            setSelectedMunicipality(null);
+            setSelectedRegionFeature(null);
+            setClickProbe({ lat: tx.lat, lon: tx.lon });
+          })
           .addTo(layer);
       });
     };
@@ -1032,57 +1038,8 @@ useEffect(() => {
       const meta = representativePoiMeta[poi.category as RepresentativePoiCategory];
       if (!meta) return;
 
-      L.circleMarker([poi.repTxLat as number, poi.repTxLon as number], {
-        radius: selectedMunicipality ? 7 : 5,
-        color: "#111827",
-        fillColor: meta.color,
-        fillOpacity: 0.9,
-        weight: 2,
-        bubblingMouseEvents: false,
-      })
-        .bindPopup(
-          `<div style="font-size:13px;line-height:1.45;min-width:210px;">
-            <strong>Transakcijska točka</strong><br/>
-            Občina: ${escapeHtml(poi.municipality)}<br/>
-            Cena/m²: <strong>${formatPricePerM2(poi.repTxPricePerM2)}</strong><br/>
-            ${meta.icon} ${escapeHtml(meta.label)}: ${formatDistance(poi.repTxNearestDistanceM)}
-          </div>`,
-        )
-        .addTo(layer);
 
-      L.marker([poi.poiLat as number, poi.poiLon as number], {
-        icon: getPoiIcon(poi.category as POICategory),
-        bubblingMouseEvents: false,
-      })
-        .bindPopup(
-          `<div style="font-size:13px;line-height:1.45;">
-            <strong>${escapeHtml(poi.poiName)}</strong><br/>
-            <span style="color:${meta.color};">${meta.icon} ${escapeHtml(meta.label)}</span>
-          </div>`,
-        )
-        .addTo(layer);
-
-      L.polyline(
-        [
-          [poi.repTxLat as number, poi.repTxLon as number],
-          [poi.poiLat as number, poi.poiLon as number],
-        ],
-        {
-          color: meta.color,
-          weight: 2,
-          opacity: 0.8,
-          dashArray: "6 4",
-          interactive: true,
-        },
-      )
-        .bindPopup(
-          `<div style="font-size:13px;line-height:1.45;">
-            <strong>${meta.icon} ${escapeHtml(meta.label)}</strong><br/>
-            ${escapeHtml(poi.poiName)}<br/>
-            Reprezentativna razdalja: <strong>${formatDistance(poi.repTxNearestDistanceM)}</strong>
-          </div>`,
-        )
-        .addTo(layer);
+     
     });
   }, [mapRepresentativePois]);
 
