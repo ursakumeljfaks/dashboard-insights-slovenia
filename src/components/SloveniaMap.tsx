@@ -409,6 +409,14 @@ const SloveniaMap = () => {
   const zoomRef = useRef<number>(SLOVENIA_ZOOM);
   const poiCacheRef = useRef<Partial<Record<POICategory, LoadedPoi[]>>>({});
   const activePoiCategoriesRef = useRef(activePoiCategories);
+  const maskLayerRef = useRef<L.Polygon | null>(null);
+
+  const [filterRooms, setFilterRooms] = useState<string>("all");
+  const [filterType, setFilterType] = useState<string>("all");
+  const [filterYearMin, setFilterYearMin] = useState<number>(2020);
+  const [filterYearMax, setFilterYearMax] = useState<number>(2025);
+  const [filterPriceMin, setFilterPriceMin] = useState<number>(0);
+  const [filterPriceMax, setFilterPriceMax] = useState<number>(15000);
 
   useEffect(() => {
     let cancelled = false;
@@ -438,6 +446,39 @@ const SloveniaMap = () => {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !regionsGeoJson || maskLayerRef.current) return;
+
+    const worldCoords: [number, number][] = [
+      [-90, -180], [-90, 180], [90, 180], [90, -180], [-90, -180]
+    ];
+
+    const holes: [number, number][][][] = regionsGeoJson.features.map((feature) => {
+      const geom = feature.geometry;
+      if (geom.type === "Polygon") {
+        return (geom.coordinates as number[][][]).map(ring =>
+          ring.map(([lon, lat]) => [lat, lon] as [number, number])
+        );
+      }
+      if (geom.type === "MultiPolygon") {
+        return (geom.coordinates as number[][][][]).flatMap(poly =>
+          poly.map(ring => ring.map(([lon, lat]) => [lat, lon] as [number, number]))
+        );
+      }
+      return [];
+    });
+
+    const mask = L.polygon([worldCoords, ...holes.flat()], {
+      color: "none",
+      fillColor: "#e8e8e8",
+      fillOpacity: 0.75,
+      interactive: false,
+    }).addTo(map);
+
+    maskLayerRef.current = mask;
+  }, [regionsGeoJson]);
 
   useEffect(() => {
     activePoiCategoriesRef.current = activePoiCategories;
@@ -586,6 +627,21 @@ const SloveniaMap = () => {
       .catch((e) => console.error("Transakcij ni bilo mogoče naložiti", e));
   }, []);
 
+  const filteredTransactions = useMemo(() => {
+
+    const types = new Set(uniqueTransactions.map((tx: any) => tx.propertyType));
+console.log("Property types:", [...types]);
+const roomValues = new Set(uniqueTransactions.map((tx: any) => tx.rooms));
+console.log("Room values:", [...roomValues]);
+  return uniqueTransactions.filter((tx: any) => {
+    if (filterRooms !== "all" && tx.rooms !== parseFloat(filterRooms)) return false;
+    if (filterType !== "all" && tx.propertyType !== filterType) return false;
+    if (tx.saleYear != null && (tx.saleYear < filterYearMin || tx.saleYear > filterYearMax)) return false;
+    if (tx.pricePerM2 != null && (tx.pricePerM2 < filterPriceMin || tx.pricePerM2 > filterPriceMax)) return false;
+    return true;
+  });
+}, [uniqueTransactions, filterRooms, filterType, filterYearMin, filterYearMax, filterPriceMin, filterPriceMax]);
+
   const selectedData = useMemo(() => {
     if (!selectedMunicipality) return null;
 
@@ -687,8 +743,10 @@ const SloveniaMap = () => {
       marker.addTo(group);
     });
 
-    group.addTo(map);
     fullPoiLayersRef.current[category] = group;
+    if (map.getZoom() >= 13) {
+      group.addTo(map);
+    }
   }, []);
 
   const loadPoisForCategory = useCallback(async (category: POICategory): Promise<LoadedPoi[]> => {
@@ -802,6 +860,7 @@ useEffect(() => {
     noWrap: false,
   }).addTo(map);
 
+  
   map.fitBounds(sloveniaBounds, {
     padding: [20, 20],
   });
@@ -835,9 +894,19 @@ useEffect(() => {
   transactionLayerRef.current = L.layerGroup().addTo(map);
 
   map.on("zoomend", () => {
-    zoomRef.current = map.getZoom();
-    setCurrentZoom(map.getZoom());
+    const zoom = map.getZoom();
+    zoomRef.current = zoom;
+    setCurrentZoom(zoom);
     map.fire("zoomchanged");
+
+    Object.values(fullPoiLayersRef.current).forEach((layer) => {
+      if (!layer) return;
+      if (zoom >= 13) {
+        if (!map.hasLayer(layer)) map.addLayer(layer);
+      } else {
+        if (map.hasLayer(layer)) map.removeLayer(layer);
+      }
+    });
   });
 
   map.on("click", (event: L.LeafletMouseEvent) => {
@@ -1006,7 +1075,7 @@ useEffect(() => {
 
       const bounds = map.getBounds();
 
-      uniqueTransactions.forEach((tx) => {
+      filteredTransactions.forEach((tx) => {
         if (!bounds.contains([tx.lat, tx.lon])) return;
 
         const color = tx.pricePerM2 != null
@@ -1046,7 +1115,7 @@ useEffect(() => {
       map.off("zoomchanged moveend", updateTransactions);
       layer.clearLayers();
     };
-  }, [uniqueTransactions, minPrice, maxPrice]);
+  }, [filteredTransactions, minPrice, maxPrice]);
 
   useEffect(() => {
     const layer = representativeLayerRef.current;
@@ -1274,6 +1343,76 @@ useEffect(() => {
         </div>
       </div>
       
+      <div className="flex flex-wrap gap-3 rounded-lg border bg-muted/20 p-3">
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-medium text-muted-foreground">Število sob</label>
+          <select
+            value={filterRooms}
+            onChange={(e) => setFilterRooms(e.target.value)}
+            className="rounded border px-2 py-1 text-sm"
+          >
+            <option value="all">Vse</option>
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="5">5+</option>
+          </select>
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-medium text-muted-foreground">Tip nepremičnine</label>
+          <select
+            value={filterType}
+            onChange={(e) => setFilterType(e.target.value)}
+            className="rounded border px-2 py-1 text-sm"
+          >
+            <option value="all">Vse</option>
+            <option value="stanovanje">Stanovanje</option>
+            <option value="hisa">Hiša</option>
+            <option value="garaza">Garaža</option>
+            <option value="poslovni">Poslovni</option>
+            <option value="klet_shramba">Klet/Shramba</option>
+            <option value="drugo">Drugo</option>
+          </select>
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-medium text-muted-foreground">Leto prodaje</label>
+          <div className="flex items-center gap-1">
+            <input type="number" value={filterYearMin} onChange={(e) => setFilterYearMin(Number(e.target.value))} className="w-20 rounded border px-2 py-1 text-sm" min={2020} max={2025} />
+            <span className="text-xs">–</span>
+            <input type="number" value={filterYearMax} onChange={(e) => setFilterYearMax(Number(e.target.value))} className="w-20 rounded border px-2 py-1 text-sm" min={2020} max={2025} />
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-medium text-muted-foreground">Cena/m² (€)</label>
+          <div className="flex items-center gap-1">
+            <input type="number" value={filterPriceMin} onChange={(e) => setFilterPriceMin(Number(e.target.value))} className="w-24 rounded border px-2 py-1 text-sm" />
+            <span className="text-xs">–</span>
+            <input type="number" value={filterPriceMax} onChange={(e) => setFilterPriceMax(Number(e.target.value))} className="w-24 rounded border px-2 py-1 text-sm" />
+          </div>
+        </div>
+
+        <div className="flex items-end">
+          <button
+            onClick={() => {
+              setFilterRooms("all");
+              setFilterType("all");
+              setFilterYearMin(2020);
+              setFilterYearMax(2025);
+              setFilterPriceMin(0);
+              setFilterPriceMax(15000);
+            }}
+            className="rounded border px-3 py-1 text-sm hover:bg-muted"
+          >
+            Ponastavi
+          </button>
+        </div>
+      </div>
+      
+
       <div className="relative">
         <input
           type="text"
