@@ -96,7 +96,7 @@ const SloveniaMap = () => {
   const mapRef = useRef<L.Map | null>(null);
   const markersLayerRef = useRef<L.LayerGroup | null>(null);
   const poiLayersRef = useRef<Record<string, L.LayerGroup>>({});
-  const poiCacheRef = useRef<Record<string, any[]>>({});
+  const poiCacheRef = useRef<Partial<Record<POICategory, LoadedPoi[]>>>({});
 
   const mapped = useMemo(
     () =>
@@ -158,8 +158,19 @@ const SloveniaMap = () => {
         });
         const json = await res.json();
         const towers = (json.elements || [])
-          .map((el: any) => ({ lat: el.lat ?? el.center?.lat, lon: el.lon ?? el.center?.lon }))
-          .filter((t: any) => t.lat && t.lon);
+          .map(
+            (el: OverpassElement): Partial<PoiCoordinate> => ({
+              lat: el.lat ?? el.center?.lat,
+              lon: el.lon ?? el.center?.lon,
+            }),
+          )
+          .filter(
+            (t): t is PoiCoordinate =>
+              typeof t.lat === "number" &&
+              Number.isFinite(t.lat) &&
+              typeof t.lon === "number" &&
+              Number.isFinite(t.lon),
+          );
         poiCacheRef.current.telecom_towers = json.elements || [];
 
         const distances: Record<string, number> = {};
@@ -268,7 +279,7 @@ const SloveniaMap = () => {
       const cfg = POI_CONFIG[category];
       const group = L.layerGroup();
 
-      elements.forEach((el: any) => {
+      elements.forEach((el: OverpassElement) => {
         const lat = el.lat ?? el.center?.lat;
         const lon = el.lon ?? el.center?.lon;
         if (!lat || !lon) return;
