@@ -12,6 +12,12 @@ import { getScatterData } from "@/data/realEstateData";
 
 const data = getScatterData();
 
+const legendItems = [
+  { color: "hsl(var(--accent))", label: "do €1.500/m²" },
+  { color: "hsl(var(--primary))", label: "€1.500–2.500/m²" },
+  { color: "hsl(var(--destructive))", label: "nad €2.500/m²" },
+];
+
 const CustomTooltip = ({ active, payload }: any) => {
   if (active && payload?.length) {
     const d = payload[0].payload;
@@ -32,7 +38,8 @@ const CustomTooltip = ({ active, payload }: any) => {
 
 const SalaryVsPriceChart = () => {
   return (
-    <div className="h-[420px] w-full">
+    <div className="w-full">
+      <div className="h-[420px] w-full">
       <ResponsiveContainer width="100%" height="100%">
         <ScatterChart margin={{ top: 20, right: 30, bottom: 20, left: 20 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
@@ -83,6 +90,18 @@ const SalaryVsPriceChart = () => {
           </Scatter>
         </ScatterChart>
       </ResponsiveContainer>
+      </div>
+      <div className="mt-3 flex flex-wrap items-center justify-center gap-4">
+        {legendItems.map((item) => (
+          <div key={item.label} className="flex items-center gap-2">
+            <span
+              className="h-3 w-3 shrink-0 rounded-full"
+              style={{ backgroundColor: item.color }}
+            />
+            <span className="text-xs text-muted-foreground">{item.label}</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 };

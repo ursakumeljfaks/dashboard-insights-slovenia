@@ -66,7 +66,8 @@ const Index = () => {
           <CardHeader>
             <CardTitle>Plača vs. cena stanovanj</CardTitle>
             <CardDescription>
-              Primerjava povprečne neto plače in cene na m² po občinah. Velikost kroga prikazuje število transakcij.
+              Vsaka pika je občina: neto plača (vodoravno) proti ceni na m² (navpično), velikost pike pa prikazuje
+              število transakcij, barva pa cenovni razred (glej legendo pod grafom).
             </CardDescription>
           </CardHeader>
           <CardContent>
