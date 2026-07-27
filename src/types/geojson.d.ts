@@ -1,4 +1,4 @@
 declare module "*.geojson" {
-  const value: any;
+  const value: GeoJSON.GeoJsonObject;
   export default value;
 }

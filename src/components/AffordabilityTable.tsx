@@ -1,7 +1,10 @@
+import { ArrowDownRight, ArrowUpRight } from "lucide-react";
+
 import { MunicipalityData } from "@/data/realEstateData";
 import {
   Table,
   TableBody,
+  TableCaption,
   TableCell,
   TableHead,
   TableHeader,
@@ -15,40 +18,87 @@ interface AffordabilityTableProps {
   variant: "affordable" | "expensive";
 }
 
+const numberFormatter = new Intl.NumberFormat("sl-SI");
+
+const getConfidenceLabel = (sampleCount: number) => {
+  if (sampleCount < 5) return "nizek vzorec";
+  if (sampleCount < 15) return "srednji vzorec";
+  return "višji vzorec";
+};
+
 const AffordabilityTable = ({ title, description, data, variant }: AffordabilityTableProps) => {
+  const RatioIcon = variant === "affordable" ? ArrowDownRight : ArrowUpRight;
+
   return (
-    <div>
-      <div className="mb-4">
-        <h3 className="text-lg font-semibold text-foreground">{title}</h3>
-        <p className="text-sm text-muted-foreground">{description}</p>
+    <section aria-labelledby={`${variant}-table-title`}>
+      <div className="mb-5">
+        <div className="flex items-center gap-2">
+          <span
+            className={`h-2 w-2 rounded-full ${
+              variant === "affordable" ? "bg-primary" : "bg-[hsl(var(--chart-negative))]"
+            }`}
+            aria-hidden="true"
+          />
+          <h3 id={`${variant}-table-title`} className="text-xl font-bold tracking-[-0.025em] text-foreground">
+            {title}
+          </h3>
+        </div>
+        <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">{description}</p>
       </div>
-      <div className="rounded-lg border overflow-hidden">
-        <Table>
+
+      <div className="-mx-2 overflow-hidden rounded-xl border border-border/80 sm:mx-0">
+        <Table className="min-w-[650px]">
+          <TableCaption className="sr-only">
+            {title}. Stolpec vzorec prikazuje število transakcij, na katerih temelji podatek.
+          </TableCaption>
           <TableHeader>
-            <TableRow className="bg-muted/50">
-              <TableHead className="font-semibold text-foreground">#</TableHead>
-              <TableHead className="font-semibold text-foreground">Občina</TableHead>
-              <TableHead className="text-right font-semibold text-foreground">Cena/m²</TableHead>
-              <TableHead className="text-right font-semibold text-foreground">Povpr. plača</TableHead>
-              <TableHead className="text-right font-semibold text-foreground">Razmerje</TableHead>
+            <TableRow className="border-border/80 bg-secondary/45 hover:bg-secondary/45">
+              <TableHead scope="col" className="h-10 w-12 px-3 text-xs font-bold uppercase tracking-[0.1em]">
+                #
+              </TableHead>
+              <TableHead scope="col" className="h-10 px-3 text-xs font-bold uppercase tracking-[0.1em] text-foreground">
+                Občina
+              </TableHead>
+              <TableHead scope="col" className="h-10 px-3 text-right text-xs font-bold uppercase tracking-[0.1em] text-foreground">
+                Cena/m²
+              </TableHead>
+              <TableHead scope="col" className="h-10 px-3 text-right text-xs font-bold uppercase tracking-[0.1em] text-foreground">
+                Plača
+              </TableHead>
+              <TableHead scope="col" className="h-10 px-3 text-right text-xs font-bold uppercase tracking-[0.1em] text-foreground">
+                Vzorec
+              </TableHead>
+              <TableHead scope="col" className="h-10 px-3 text-right text-xs font-bold uppercase tracking-[0.1em] text-foreground">
+                Razmerje
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {data.map((row, i) => (
-              <TableRow key={row.municipality} className="hover:bg-muted/30 transition-colors">
-                <TableCell className="text-muted-foreground font-medium">{i + 1}</TableCell>
-                <TableCell className="font-medium">{row.municipality}</TableCell>
-                <TableCell className="text-right tabular-nums">€{row.avgPricePerM2.toLocaleString()}</TableCell>
-                <TableCell className="text-right tabular-nums">€{row.avgNetSalary.toLocaleString()}</TableCell>
-                <TableCell className="text-right">
+            {data.map((row, index) => (
+              <TableRow key={row.municipality} className="border-border/65 hover:bg-primary/[0.035]">
+                <TableCell className="px-3 py-3.5 font-mono text-xs font-semibold text-muted-foreground">{index + 1}</TableCell>
+                <TableCell className="px-3 py-3.5 font-semibold text-foreground">{row.municipality}</TableCell>
+                <TableCell className="px-3 py-3.5 text-right text-sm text-foreground tabular-nums">
+                  €{numberFormatter.format(row.avgPricePerM2)}
+                </TableCell>
+                <TableCell className="px-3 py-3.5 text-right text-sm text-muted-foreground tabular-nums">
+                  €{numberFormatter.format(row.avgNetSalary)}
+                </TableCell>
+                <TableCell className="px-3 py-3.5 text-right">
+                  <span className="font-mono text-xs font-semibold text-foreground">{numberFormatter.format(row.sampleCount)}</span>
+                  <span className="sr-only">, {getConfidenceLabel(row.sampleCount)}</span>
+                </TableCell>
+                <TableCell className="px-3 py-3.5 text-right">
                   <span
-                    className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${
+                    className={`inline-flex min-w-[4.5rem] items-center justify-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold tabular-nums ${
                       variant === "affordable"
-                        ? "bg-accent/15 text-accent"
-                        : "bg-destructive/15 text-destructive"
+                        ? "bg-primary/10 text-primary"
+                        : "bg-[hsl(var(--chart-negative)/0.12)] text-[hsl(var(--chart-negative))]"
                     }`}
                   >
-                    {row.affordabilityRatio.toFixed(2)}x
+                    <RatioIcon className="h-3.5 w-3.5" aria-hidden="true" />
+                    {row.affordabilityRatio.toFixed(2)}×
+                    <span className="sr-only">{variant === "affordable" ? ", nižje razmerje" : ", višje razmerje"}</span>
                   </span>
                 </TableCell>
               </TableRow>
@@ -56,7 +106,7 @@ const AffordabilityTable = ({ title, description, data, variant }: Affordability
           </TableBody>
         </Table>
       </div>
-    </div>
+    </section>
   );
 };
 

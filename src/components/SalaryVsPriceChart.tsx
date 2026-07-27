@@ -1,109 +1,132 @@
 import {
-  ScatterChart,
+  CartesianGrid,
+  Cell,
+  ResponsiveContainer,
   Scatter,
+  ScatterChart,
+  Tooltip,
   XAxis,
   YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Cell,
+  ZAxis,
 } from "recharts";
+
 import { getScatterData } from "@/data/realEstateData";
 
 const data = getScatterData();
-
-const legendItems = [
-  { color: "hsl(var(--accent))", label: "do €1.500/m²" },
-  { color: "hsl(var(--primary))", label: "€1.500–2.500/m²" },
-  { color: "hsl(var(--destructive))", label: "nad €2.500/m²" },
-];
-
-const CustomTooltip = ({ active, payload }: any) => {
-  if (active && payload?.length) {
-    const d = payload[0].payload;
-    return (
-      <div className="rounded-lg border bg-card p-3 shadow-md">
-        <p className="font-semibold text-card-foreground">{d.name}</p>
-        <p className="text-sm text-muted-foreground">
-          Neto plača: <span className="font-medium text-foreground">€{d.x.toLocaleString()}</span>
-        </p>
-        <p className="text-sm text-muted-foreground">
-          Cena/m²: <span className="font-medium text-foreground">€{d.y.toLocaleString()}</span>
-        </p>
-      </div>
-    );
-  }
-  return null;
+const currencyFormatter = new Intl.NumberFormat("sl-SI");
+type ScatterDatum = (typeof data)[number];
+type CustomTooltipProps = {
+  active?: boolean;
+  payload?: Array<{ payload: ScatterDatum }>;
 };
 
-const SalaryVsPriceChart = () => {
+const legendItems = [
+  { color: "hsl(var(--chart-positive))", label: "do 1.500 €/m²" },
+  { color: "hsl(var(--primary))", label: "1.500–2.500 €/m²" },
+  { color: "hsl(var(--chart-negative))", label: "nad 2.500 €/m²" },
+];
+
+const getPriceColor = (price: number) => {
+  if (price > 2500) return "hsl(var(--chart-negative))";
+  if (price > 1500) return "hsl(var(--primary))";
+  return "hsl(var(--chart-positive))";
+};
+
+const CustomTooltip = ({ active, payload }: CustomTooltipProps) => {
+  if (!active || !payload?.length) return null;
+
+  const municipality = payload[0].payload;
+
   return (
-    <div className="w-full">
-      <div className="h-[420px] w-full">
+    <div className="min-w-48 rounded-xl border border-border/90 bg-card/95 p-3.5 shadow-[0_18px_45px_-18px_hsl(var(--foreground)/0.4)] backdrop-blur">
+      <p className="font-bold tracking-[-0.01em] text-card-foreground">{municipality.name}</p>
+      <dl className="mt-2 space-y-1.5 text-sm">
+        <div className="flex items-center justify-between gap-5">
+          <dt className="text-muted-foreground">Neto plača</dt>
+          <dd className="font-semibold text-foreground tabular-nums">€{currencyFormatter.format(municipality.x)}</dd>
+        </div>
+        <div className="flex items-center justify-between gap-5">
+          <dt className="text-muted-foreground">Cena/m²</dt>
+          <dd className="font-semibold text-foreground tabular-nums">€{currencyFormatter.format(municipality.y)}</dd>
+        </div>
+        <div className="flex items-center justify-between gap-5">
+          <dt className="text-muted-foreground">Transakcije</dt>
+          <dd className="font-semibold text-foreground tabular-nums">{currencyFormatter.format(municipality.z)}</dd>
+        </div>
+      </dl>
+    </div>
+  );
+};
+
+const SalaryVsPriceChart = () => (
+  <div className="w-full">
+    <div
+      className="h-[310px] w-full sm:h-[380px] lg:h-[430px]"
+      role="img"
+      aria-label={`Razsevni diagram ${data.length} občin. Vodoravna os prikazuje povprečno neto plačo, navpična os ceno na kvadratni meter, velikost pike pa število transakcij.`}
+    >
       <ResponsiveContainer width="100%" height="100%">
-        <ScatterChart margin={{ top: 20, right: 30, bottom: 20, left: 20 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+        <ScatterChart margin={{ top: 10, right: 12, bottom: 24, left: 0 }}>
+          <CartesianGrid vertical={false} strokeDasharray="2 6" stroke="hsl(var(--border))" />
           <XAxis
             type="number"
             dataKey="x"
             name="Neto plača"
-            unit="€"
-            tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
+            height={48}
+            tickLine={false}
+            axisLine={{ stroke: "hsl(var(--border))" }}
+            tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
+            tickFormatter={(value) => `€${currencyFormatter.format(value)}`}
             label={{
-              value: "Povprečna neto plača (€)",
+              value: "Povprečna neto plača",
               position: "insideBottom",
-              offset: -10,
+              offset: -12,
               fill: "hsl(var(--muted-foreground))",
-              fontSize: 13,
+              fontSize: 12,
+              fontWeight: 600,
             }}
           />
           <YAxis
             type="number"
             dataKey="y"
             name="Cena/m²"
-            unit="€"
-            tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
-            label={{
-              value: "Cena stanovanja (€/m²)",
-              angle: -90,
-              position: "insideLeft",
-              offset: 5,
-              fill: "hsl(var(--muted-foreground))",
-              fontSize: 13,
-            }}
+            width={64}
+            tickLine={false}
+            axisLine={false}
+            tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
+            tickFormatter={(value) => `€${currencyFormatter.format(value)}`}
           />
-          <Tooltip content={<CustomTooltip />} />
-          <Scatter data={data} fill="hsl(var(--chart-scatter))">
-            {data.map((entry, index) => (
+          <ZAxis type="number" dataKey="z" name="Število transakcij" range={[64, 500]} />
+          <Tooltip cursor={{ stroke: "hsl(var(--primary))", strokeDasharray: "3 4", strokeOpacity: 0.45 }} content={<CustomTooltip />} />
+          <Scatter data={data}>
+            {data.map((entry) => (
               <Cell
-                key={index}
-                fill={
-                  entry.y > 2500
-                    ? "hsl(var(--destructive))"
-                    : entry.y > 1500
-                    ? "hsl(var(--primary))"
-                    : "hsl(var(--accent))"
-                }
-                r={Math.max(6, Math.min(16, entry.z / 30))}
+                key={entry.name}
+                fill={getPriceColor(entry.y)}
+                fillOpacity={0.78}
+                stroke="hsl(var(--card))"
+                strokeWidth={1.5}
               />
             ))}
           </Scatter>
         </ScatterChart>
       </ResponsiveContainer>
-      </div>
-      <div className="mt-3 flex flex-wrap items-center justify-center gap-4">
-        {legendItems.map((item) => (
-          <div key={item.label} className="flex items-center gap-2">
-            <span
-              className="h-3 w-3 shrink-0 rounded-full"
-              style={{ backgroundColor: item.color }}
-            />
-            <span className="text-xs text-muted-foreground">{item.label}</span>
-          </div>
-        ))}
-      </div>
     </div>
-  );
-};
+
+    <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-border/70 pt-4" aria-label="Legenda cenovnih razredov">
+      <span className="mr-1 text-[0.68rem] font-bold uppercase tracking-[0.14em] text-muted-foreground">Cena</span>
+      {legendItems.map((item) => (
+        <div key={item.label} className="flex items-center gap-2">
+          <span
+            className="h-2.5 w-2.5 shrink-0 rounded-full ring-2 ring-card"
+            style={{ backgroundColor: item.color }}
+            aria-hidden="true"
+          />
+          <span className="text-xs font-medium text-muted-foreground">{item.label}</span>
+        </div>
+      ))}
+    </div>
+  </div>
+);
 
 export default SalaryVsPriceChart;

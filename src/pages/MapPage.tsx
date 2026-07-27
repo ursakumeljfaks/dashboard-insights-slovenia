@@ -1,43 +1,44 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Map } from "lucide-react";
+import { ArrowRight, MapPinned } from "lucide-react";
 import { Link } from "react-router-dom";
 import SloveniaMap from "@/components/SloveniaMap";
 
 const MapPage = () => {
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b bg-card">
-        <div className="container mx-auto flex items-center gap-3 px-6 py-5">
-          <Link to="/">
-            <Button variant="ghost" size="icon">
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-          </Link>
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary">
-            <Map className="h-5 w-5 text-primary-foreground" />
+    <div className="pb-12">
+      <section className="border-b bg-card/55">
+        <div className="mx-auto grid max-w-[1480px] gap-6 px-4 py-8 sm:px-6 sm:py-10 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end lg:px-8">
+          <div className="max-w-3xl">
+            <div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-primary">
+              <MapPinned className="h-4 w-4" aria-hidden="true" />
+              Prostorski pregled
+            </div>
+            <h1 className="text-balance text-3xl font-semibold tracking-[-0.035em] sm:text-4xl">
+              Od državnega pregleda do konkretne lokacije
+            </h1>
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
+              Raziščite cene in transakcije po občinah, nato povečajte zemljevid za podrobnosti o bližnjih
+              storitvah. Občinski agregati in filtri transakcijskih točk so namenoma jasno ločeni.
+            </p>
           </div>
-          <div>
-            <h1 className="text-xl font-bold text-foreground tracking-tight">Zemljevid Slovenije</h1>
-            <p className="text-sm text-muted-foreground">Interaktivni prikaz cen stanovanj po občinah</p>
+
+          <div className="flex flex-wrap gap-2">
+            <Button asChild variant="outline" className="rounded-full">
+              <Link to="/methodology">Kako brati podatke</Link>
+            </Button>
+            <Button asChild className="rounded-full">
+              <Link to="/compare">
+                Primerjaj občini
+                <ArrowRight className="h-4 w-4" aria-hidden="true" />
+              </Link>
+            </Button>
           </div>
         </div>
-      </header>
+      </section>
 
-      <main className="container mx-auto space-y-6 px-6 py-8">
-        <Card>
-          <CardHeader>
-            <CardTitle>Cene stanovanj po občinah</CardTitle>
-            <CardDescription>
-              Vsak krog predstavlja občino. Barva prikazuje ceno/m², velikost pa število transakcij.
-              Kliknite na krog za podrobnosti.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <SloveniaMap />
-          </CardContent>
-        </Card>
-      </main>
+      <div className="mx-auto max-w-[1480px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+        <SloveniaMap />
+      </div>
     </div>
   );
 };

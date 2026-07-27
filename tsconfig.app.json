@@ -22,5 +22,6 @@
     "types": ["vitest/globals"],
     "useDefineForClassFields": true
   },
-  "include": ["src"]
+  "include": ["src"],
+  "exclude": ["src/components/SloveniaMapORIG.tsx"]
 }

@@ -10,7 +10,7 @@ export interface MunicipalityData {
   affordabilityRatio: number;
 }
 
-export const municipalityData: MunicipalityData[] = [
+const rawMunicipalityData: MunicipalityData[] = [
   { municipality: "Ajdovščina", avgPricePerM2: 1923, avgGrossSalary: 2051, avgNetSalary: 1336, sampleCount: 71, affordabilityRatio: 1.44 },
   { municipality: "Ankaran", avgPricePerM2: 3605, avgGrossSalary: 2255, avgNetSalary: 1447, sampleCount: 76, affordabilityRatio: 2.49 },
   { municipality: "Apače", avgPricePerM2: 1175, avgGrossSalary: 1971, avgNetSalary: 1299, sampleCount: 5, affordabilityRatio: 0.90 },
@@ -210,6 +210,18 @@ export const municipalityData: MunicipalityData[] = [
   { municipality: "Žirovnica", avgPricePerM2: 1882, avgGrossSalary: 2177, avgNetSalary: 1415, sampleCount: 13, affordabilityRatio: 1.33 },
   { municipality: "Žužemberk", avgPricePerM2: 1231, avgGrossSalary: 1863, avgNetSalary: 1220, sampleCount: 6, affordabilityRatio: 1.01 },
 ];
+
+const knownDuplicateAliases = new Set([
+  "Sv. Trojica V Slov. Goricah",
+  "Sveti Jurij V Slov. Goricah",
+]);
+
+// Keep one official, unabbreviated row for two known duplicate municipality
+// aliases. The conflicting alias values are not merged because the source
+// contains no provenance that would justify a weighted combination.
+export const municipalityData = rawMunicipalityData.filter(
+  (row) => !knownDuplicateAliases.has(row.municipality),
+);
 
 export const getMostAffordable = (count = 10) =>
   [...municipalityData].sort((a, b) => a.affordabilityRatio - b.affordabilityRatio).slice(0, count);

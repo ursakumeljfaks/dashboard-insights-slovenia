@@ -1,3 +1,7 @@
+type NutsRegionProperties = {
+  ENOTA?: string;
+};
+
 export async function loadSloveniaNuts3() {
   const response = await fetch("/data/SR.geojson");
 
@@ -5,11 +9,11 @@ export async function loadSloveniaNuts3() {
     throw new Error("Failed to load SR.geojson");
   }
 
-  const geojson = await response.json();
+  const geojson = (await response.json()) as GeoJSON.FeatureCollection<GeoJSON.Geometry, NutsRegionProperties>;
 
   return {
     ...geojson,
-    features: geojson.features.filter((f: any) => f.properties?.ENOTA === "SR"),
+    features: geojson.features.filter((feature) => feature.properties?.ENOTA === "SR"),
   };
 }
 
