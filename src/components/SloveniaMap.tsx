@@ -1595,8 +1595,6 @@ useEffect(() => {
               <div className="flex flex-wrap gap-2">
                 {([
                   ["prices", "Cena na m²", false],
-                  ["affordable", "Najbolj dostopne", !hasAffordabilityData],
-                  ["expensive", "Najmanj dostopne", !hasAffordabilityData],
                 ] as [LayerType, string, boolean][]).map(([key, label, disabled]) => (
                   <button
                     key={key}
@@ -1740,13 +1738,6 @@ useEffect(() => {
               </fieldset>
             </div>
           </details>
-
-          {!hasAffordabilityData && (
-            <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-              Prikaz dostopnosti je začasno izklopljen, ker časovno označeni cenovni nabor nima združljivih podatkov o
-              plačah.
-            </div>
-          )}
 
           <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm leading-6 text-sky-950">
             Občinski krogi, barvna lestvica, povprečje in rang so izračunani samo za leto {mapComparisonYear} (

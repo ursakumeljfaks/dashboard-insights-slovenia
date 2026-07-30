@@ -1,15 +1,12 @@
 import AffordabilityTable from "@/components/AffordabilityTable";
 import SalaryVsPriceChart from "@/components/SalaryVsPriceChart";
-import { Button } from "@/components/ui/button";
 import { municipalityData } from "@/data/realEstateData";
 import {
   ArrowRight,
   Building2,
   Database,
-  Info,
   Map,
   MapPin,
-  Scale,
   WalletCards,
   type LucideIcon,
 } from "lucide-react";
@@ -39,55 +36,6 @@ const MarketMetric = ({ icon: Icon, label, value, note }: MarketMetricProps) => 
   </div>
 );
 
-const DataStatus = () => (
-  <div className="flex flex-col gap-3 rounded-xl border border-border/90 bg-card px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between">
-    <div className="flex min-w-0 items-start gap-3">
-      <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-amber-100 text-amber-800">
-        <Info className="h-3.5 w-3.5" aria-hidden="true" />
-      </span>
-      <div className="min-w-0">
-        <p className="text-sm font-semibold text-foreground">Primerjalni podatkovni nabor</p>
-        <p className="mt-0.5 text-xs leading-5 text-muted-foreground">
-          {municipalityData.length} občin · vir in obdobje agregata še nista dokumentirana
-        </p>
-      </div>
-    </div>
-    <Link
-      className="ml-10 inline-flex min-h-9 shrink-0 items-center text-xs font-semibold text-primary underline-offset-4 hover:underline sm:ml-0"
-      to="/methodology"
-    >
-      Preveri metodologijo
-      <ArrowRight className="ml-1.5 h-3.5 w-3.5" aria-hidden="true" />
-    </Link>
-  </div>
-);
-
-const ViewAction = ({
-  description,
-  icon: Icon,
-  label,
-  to,
-}: {
-  description: string;
-  icon: LucideIcon;
-  label: string;
-  to: string;
-}) => (
-  <Link
-    to={to}
-    className="group flex min-w-0 items-center gap-3 rounded-lg border border-border/90 bg-card p-3.5 transition-colors hover:border-primary/30 hover:bg-primary/[0.035] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-  >
-    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-      <Icon className="h-4 w-4" aria-hidden="true" />
-    </span>
-    <div className="min-w-0">
-      <p className="text-sm font-semibold text-foreground">{label}</p>
-      <p className="mt-0.5 truncate text-xs text-muted-foreground">{description}</p>
-    </div>
-    <ArrowRight className="ml-auto h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-primary" aria-hidden="true" />
-  </Link>
-);
-
 const Index = () => {
   const comparisonReadyMunicipalities = municipalityData.filter((row) => row.sampleCount >= 15);
   const mostAffordable = [...comparisonReadyMunicipalities]
@@ -105,35 +53,18 @@ const Index = () => {
     <div>
       <section className="border-b border-border/80 bg-secondary/20" aria-labelledby="page-title">
         <div className="mx-auto max-w-[1480px] px-4 py-5 sm:px-6 sm:py-6 lg:px-8">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div className="max-w-3xl">
-              <p className="text-xs font-bold uppercase tracking-[0.14em] text-primary">Pregled trga</p>
-              <h1
-                id="page-title"
-                className="mt-2 text-3xl font-bold tracking-[-0.035em] text-foreground sm:text-4xl"
-              >
-                Slovenski nepremičninski trg po občinah
-              </h1>
-              <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base sm:leading-7">
-                Primerjajte cene stanovanj z lokalnimi plačami in preverite, koliko transakcij podpira posamezen
-                občinski podatek.
-              </p>
-            </div>
-
-            <div className="grid shrink-0 grid-cols-2 gap-2 lg:flex">
-              <Button asChild className="h-11 rounded-lg px-2 min-[360px]:px-4">
-                <Link to="/compare">
-                  Primerjaj občini
-                  <ArrowRight className="hidden h-4 w-4 min-[360px]:block" aria-hidden="true" />
-                </Link>
-              </Button>
-              <Button asChild variant="outline" className="h-11 rounded-lg bg-card px-2 min-[360px]:px-4">
-                <Link to="/map">
-                  <Map className="h-4 w-4" aria-hidden="true" />
-                  Zemljevid
-                </Link>
-              </Button>
-            </div>
+          <div className="max-w-3xl">
+            <p className="text-xs font-bold uppercase tracking-[0.14em] text-primary">Pregled trga</p>
+            <h1
+              id="page-title"
+              className="mt-2 text-3xl font-bold tracking-[-0.035em] text-foreground sm:text-4xl"
+            >
+              Slovenski nepremičninski trg po občinah
+            </h1>
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base sm:leading-7">
+              Primerjajte cene stanovanj z lokalnimi plačami in preverite, koliko transakcij podpira posamezen
+              občinski podatek.
+            </p>
           </div>
         </div>
       </section>
@@ -202,9 +133,7 @@ const Index = () => {
           </aside>
         </div>
 
-        <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
-          <DataStatus />
-
+        <div className="mt-4">
           <div className="overflow-hidden rounded-xl border border-border/90 bg-border/80">
             <div className="grid h-full grid-cols-2 gap-px xl:grid-cols-4">
               <MarketMetric
@@ -235,20 +164,6 @@ const Index = () => {
           </div>
         </div>
 
-        <div className="mt-4 grid gap-3 md:grid-cols-2">
-          <ViewAction
-            icon={Scale}
-            label="Primerjaj dve občini"
-            description="Pet ločenih meril brez skupne ocene"
-            to="/compare"
-          />
-          <ViewAction
-            icon={Map}
-            label="Razišči zemljevid"
-            description="Cene in transakcije po lokaciji"
-            to="/map"
-          />
-        </div>
       </section>
 
       <section className="border-y border-border/80 bg-secondary/30" aria-labelledby="affordability-title">
@@ -283,24 +198,6 @@ const Index = () => {
                 variant="expensive"
               />
             </div>
-          </div>
-
-          <div className="mt-6 flex flex-col gap-4 rounded-2xl border border-primary/15 bg-primary/[0.055] p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
-            <div className="flex items-start gap-3">
-              <Scale className="mt-0.5 h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
-              <div>
-                <p className="text-sm font-semibold text-foreground">Rang ne nadomesti primerjave.</p>
-                <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                  Primerjajte vseh pet meril in preverite kakovost obeh vzorcev.
-                </p>
-              </div>
-            </div>
-            <Button asChild variant="outline" className="h-11 shrink-0 rounded-full border-primary/30 bg-card px-5 text-primary hover:bg-primary hover:text-primary-foreground">
-              <Link to="/compare">
-                Odpri primerjavo
-                <ArrowRight className="h-4 w-4" aria-hidden="true" />
-              </Link>
-            </Button>
           </div>
         </div>
       </section>
