@@ -1223,8 +1223,27 @@ useEffect(() => {
           `)
           .on("click", (event: L.LeafletMouseEvent) => {
             L.DomEvent.stopPropagation(event.originalEvent);
-            setSelectedMunicipality(null);
             setClickProbe({ lat: tx.lat, lon: tx.lon });
+
+            const municipalityKey = normalizeMunicipalityKey(tx.municipality);
+            const hasMunicipalityData = comparableMunicipalities.some(
+              (row) => row.municipalityKey === municipalityKey,
+            );
+            setSelectedMunicipality(hasMunicipalityData ? municipalityKey : null);
+
+            const containingRegion = regionsGeoJson?.features.find((feature) =>
+              pointInFeature(tx.lat, tx.lon, feature as GeoJsonFeature),
+            ) as GeoJsonFeature | undefined;
+
+            if (containingRegion) {
+              setSelectedRegionId(getFeatureRegionId(containingRegion));
+              setSelectedRegionName(getFeatureName(containingRegion));
+              setSelectedRegionFeature(containingRegion);
+            } else {
+              setSelectedRegionId(null);
+              setSelectedRegionName(null);
+              setSelectedRegionFeature(null);
+            }
           })
           .addTo(layer);
       });
@@ -1237,7 +1256,7 @@ useEffect(() => {
       map.off("zoomend moveend", updateTransactions);
       layer.clearLayers();
     };
-  }, [displayedTransactions, minPrice, maxPrice]);
+  }, [displayedTransactions, minPrice, maxPrice, comparableMunicipalities, regionsGeoJson]);
 
   useEffect(() => {
     const layer = representativeLayerRef.current;
