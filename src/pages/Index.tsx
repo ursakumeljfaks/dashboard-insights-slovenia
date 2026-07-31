@@ -84,10 +84,10 @@ const Index = () => {
           <h2 id="relationship-title" className="mt-1.5 text-2xl font-bold tracking-[-0.03em] text-foreground sm:text-3xl">
             Plača vs. cena stanovanj
           </h2>
-          <p className="mt-2 max-w-5xl text-sm leading-6 text-muted-foreground">
+          {/* <p className="mt-2 max-w-5xl text-sm leading-6 text-muted-foreground">
             Vsaka pika je občina: neto plača (vodoravno) proti ceni na m² (navpično), velikost pike pa prikazuje
             število transakcij, barva pa cenovni razred (glej legendo pod grafom).
-          </p>
+          </p> */}
         </div>
 
         <div className="overflow-hidden rounded-[1.5rem] border border-border/90 bg-card shadow-[0_24px_70px_-46px_hsl(var(--foreground)/0.4)] xl:grid xl:grid-cols-[minmax(0,1fr)_330px]">
@@ -108,7 +108,7 @@ const Index = () => {
                 </span>
                 <div>
                   <p className="text-sm font-semibold text-foreground">Položaj je primerjava</p>
-                  <p className="mt-1 text-sm leading-6 text-muted-foreground">Desno pomeni višjo plačo, višje pa dražji m².</p>
+                  <p className="mt-1 text-sm leading-6 text-muted-foreground">Vodoravno v desno pomeni višjo povprečno plačo, navpično in višje pa dražja cena nepremičnine na m².</p>
                 </div>
               </li>
               <li className="grid grid-cols-[2rem_1fr] gap-3">
@@ -117,7 +117,7 @@ const Index = () => {
                 </span>
                 <div>
                   <p className="text-sm font-semibold text-foreground">Velikost pomeni vzorec</p>
-                  <p className="mt-1 text-sm leading-6 text-muted-foreground">Večja pika temelji na več transakcijah.</p>
+                  <p className="mt-1 text-sm leading-6 text-muted-foreground">Večja pika pomeni več transakcij, kar pomeni več prodanih nepremičnin.</p>
                 </div>
               </li>
               <li className="grid grid-cols-[2rem_1fr] gap-3">
@@ -126,7 +126,7 @@ const Index = () => {
                 </span>
                 <div>
                   <p className="text-sm font-semibold text-foreground">Barva je cenovni razred</p>
-                  <p className="mt-1 text-sm leading-6 text-muted-foreground">Ni ocena kakovosti bivanja ali priporočilo.</p>
+                  <p className="mt-1 text-sm leading-6 text-muted-foreground">Barva predstavlja cenovni razred nepremičnine, ki je opisan pod grafom.</p>
                 </div>
               </li>
             </ol>

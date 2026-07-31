@@ -106,6 +106,10 @@ const AffordabilityTable = ({ title, description, data, variant }: Affordability
           </TableBody>
         </Table>
       </div>
+      <p className="mt-2 text-xs leading-5 text-muted-foreground">
+        Stolpec vzorec prikazuje število transakcij, na katerih temelji podatek. Razmerje pove, koliko mesečnih neto
+        plač je potrebnih za en m² stanovanja (cena/m² deljena z neto plačo).
+      </p>
     </section>
   );
 };
