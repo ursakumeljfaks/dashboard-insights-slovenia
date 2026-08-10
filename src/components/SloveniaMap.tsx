@@ -12,6 +12,22 @@ import "leaflet/dist/leaflet.css";
 import "leaflet.markercluster";
 import "leaflet.markercluster/dist/MarkerCluster.css";
 import "leaflet.markercluster/dist/MarkerCluster.Default.css";
+import "leaflet.markercluster";
+declare module "leaflet" {
+  function markerClusterGroup(options?: L.MarkerClusterGroupOptions): L.MarkerClusterGroup;
+  interface MarkerClusterGroup extends L.LayerGroup {}
+  interface MarkerClusterGroupOptions {
+    chunkedLoading?: boolean;
+    showCoverageOnHover?: boolean;
+    disableClusteringAtZoom?: number;
+    maxClusterRadius?: number;
+    spiderfyOnMaxZoom?: boolean;
+    spiderfyDistanceMultiplier?: number;
+    zoomToBoundsOnClick?: boolean;
+  }
+}
+
+
 
 const SLOVENIA_CENTER: [number, number] = [46.15, 14.95];
 const SLOVENIA_ZOOM = 8;
@@ -465,6 +481,7 @@ const SloveniaMap = () => {
   const activePoiCategoriesRef = useRef(activePoiCategories);
   const maskLayerRef = useRef<L.Polygon | null>(null);
   const searchAbortRef = useRef<AbortController | null>(null);
+  const visibleDataRef = useRef<typeof visibleData>([]);
 
   const [filterRooms, setFilterRooms] = useState<string>("all");
   const [filterType, setFilterType] = useState<string>("all");
@@ -538,6 +555,8 @@ const SloveniaMap = () => {
   useEffect(() => {
     activePoiCategoriesRef.current = activePoiCategories;
   }, [activePoiCategories]);
+
+
 
   const coordinateLookup = useMemo(
     () =>
@@ -638,6 +657,10 @@ const SloveniaMap = () => {
     }
     return comparableMunicipalities.filter((d) => bottom10.has(d.municipalityKey));
   }, [activeLayer, comparableMunicipalities, hasAffordabilityData, top10, bottom10]);
+
+  useEffect(() => {
+  visibleDataRef.current = visibleData;
+}, [visibleData]);
 
   const nationalAvgPrice = useMemo(
     () => {
@@ -977,6 +1000,11 @@ useEffect(() => {
     setCurrentZoom(zoom);
     map.fire("zoomchanged");
 
+    if (zoom < 13) {
+    setClickProbe(null);
+    nearestLayerRef.current?.clearLayers();
+  }
+
     Object.values(fullPoiLayersRef.current).forEach((layer) => {
       if (!layer) return;
       if (zoom >= 13) {
@@ -987,6 +1015,29 @@ useEffect(() => {
     });
   });
 
+  map.on("moveend", () => {
+  const center = map.getCenter();
+  const zoom = map.getZoom();
+  
+  if (zoom < 10) return;
+
+  let closest: string | null = null;
+  let closestDist = Infinity;
+
+  visibleDataRef.current.forEach((d) => {
+    const dist = haversineM(center.lat, center.lng, d.lat, d.lon);
+    if (dist < closestDist) {
+      closestDist = dist;
+      closest = d.municipalityKey;
+    }
+  });
+
+  if (closest && closestDist < 15000) {
+    setSelectedMunicipality(closest);
+  }
+});
+
+
   map.on("click", (event: L.LeafletMouseEvent) => {
     setClickProbe({ lat: event.latlng.lat, lon: event.latlng.lng });
   });
@@ -996,6 +1047,7 @@ useEffect(() => {
   return () => {
     map.off("click");
     map.off("zoomend");
+    map.off("moveend");
     markersLayerRef.current?.off("clusterclick");
     regionsLayerRef.current?.remove();
     markersLayerRef.current?.clearLayers();
@@ -1320,27 +1372,7 @@ useEffect(() => {
         )
         .addTo(layer);
 
-      L.polyline(
-        [
-          [poi.repTxLat as number, poi.repTxLon as number],
-          [poi.poiLat as number, poi.poiLon as number],
-        ],
-        {
-          color: meta.color,
-          weight: 2,
-          opacity: 0.8,
-          dashArray: "6 4",
-          interactive: true,
-        },
-      )
-        .bindPopup(
-          `<div style="font-size:13px;line-height:1.45;">
-            <strong>${meta.icon} ${escapeHtml(meta.label)}</strong><br/>
-            ${escapeHtml(poi.poiName)}<br/>
-            Reprezentativna razdalja: <strong>${formatDistance(poi.repTxNearestDistanceM)}</strong>
-          </div>`,
-        )
-        .addTo(layer);
+     
     });
   }, [mapRepresentativePois, selectedMunicipality]);
 
