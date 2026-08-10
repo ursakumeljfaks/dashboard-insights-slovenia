@@ -1039,7 +1039,24 @@ useEffect(() => {
 
 
   map.on("click", (event: L.LeafletMouseEvent) => {
-    setClickProbe({ lat: event.latlng.lat, lon: event.latlng.lng });
+    const { lat, lng } = event.latlng;
+    setClickProbe({ lat, lon: lng });
+
+    // Najdi najbližjo občino od kliknjene točke
+    let closest: string | null = null;
+    let closestDist = Infinity;
+
+    visibleDataRef.current.forEach((d) => {
+      const dist = haversineM(lat, lng, d.lat, d.lon);
+      if (dist < closestDist) {
+        closestDist = dist;
+        closest = d.municipalityKey;
+      }
+    });
+
+    if (closest && closestDist < 20000) {
+      setSelectedMunicipality(closest);
+    }
   });
 
   mapRef.current = map;
