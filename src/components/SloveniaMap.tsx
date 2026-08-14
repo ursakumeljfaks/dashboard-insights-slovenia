@@ -866,37 +866,32 @@ const SloveniaMap = () => {
       // ignore
     }
 
-    const cfg = POI_CONFIG[category];
-    const response = await fetch(OVERPASS_URL, {
-      method: "POST",
-      body: `data=${encodeURIComponent(cfg.query)}`,
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    });
-
+   const response = await fetch("/data/fullPoisLatest.json");
     if (!response.ok) {
-      throw new Error(`Overpass request failed for ${cfg.label}: ${response.status}`);
+      throw new Error(`fullPoisLatest.json request failed: ${response.status}`);
     }
 
-    const json = (await response.json()) as { elements?: OverpassElement[] };
-    const seen = new Set<string>();
-    const pois = (json.elements ?? [])
-      .map((el) => elementToLoadedPoi(el, category))
-      .filter((poi): poi is LoadedPoi => poi !== null)
-      .filter((poi) => {
-        const key = `${poi.category}-${poi.id}-${poi.lat.toFixed(6)}-${poi.lon.toFixed(6)}`;
-        if (seen.has(key)) return false;
-        seen.add(key);
-        return true;
-      });
+    const json = (await response.json()) as { pois?: any[] };
+    const pois = (json.pois ?? [])
+      .filter((el: any) => el.category === category)
+      .map((el: any) => ({
+        id: el.id,
+        category: el.category as POICategory,
+        name: el.name,
+        lat: el.lat,
+        lon: el.lon,
+        tags: el.tags ?? {},
+      }))
+      .filter((poi): poi is LoadedPoi => poi !== null);
 
-    poiCacheRef.current[category] = pois;
-    try {
-      localStorage.setItem(`poi_cache_${category}`, JSON.stringify(pois));
-    } catch {
-      // ignore če je localStorage poln
-    }
-    return pois;
-  }, []);
+        poiCacheRef.current[category] = pois;
+        try {
+          localStorage.setItem(`poi_cache_${category}`, JSON.stringify(pois));
+        } catch {
+          // ignore če je localStorage poln
+        }
+        return pois;
+      }, []);
 
   const togglePoiCategory = useCallback(
     async (category: POICategory) => {
